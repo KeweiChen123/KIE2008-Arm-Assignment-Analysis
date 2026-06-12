@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARM Assembly Analysis — Zebra Crossing Light Controller (STM32F446RE)</title>
+<style>
+/* ===== RESET & BASE ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1c2128;--bg4:#21262d;
+  --fg:#c9d1d9;--fg2:#8b949e;--accent:#58a6ff;--accent2:#79c0ff;
+  --green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#bc8cff;
+  --orange:#d18616;--pink:#f778ba;--cyan:#39d353;
+  --border:#30363d;--code-bg:#0d1117;
+  --radius:8px;--transition:0.25s ease;
+}
+html{scroll-behavior:smooth;font-size:15px}
+body{background:var(--bg);color:var(--fg);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;line-height:1.7;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none;transition:color var(--transition)}
+a:hover{color:var(--accent2);text-decoration:underline}
+
+/* ===== HEADER ===== */
+.hero{background:linear-gradient(135deg,#0d1117 0%,#161b22 40%,#1a1e2e 100%);border-bottom:1px solid var(--border);padding:3rem 2rem;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 50%,rgba(88,166,255,.06) 0%,transparent 50%),radial-gradient(circle at 70% 80%,rgba(63,185,80,.04) 0%,transparent 40%);pointer-events:none}
+.hero h1{font-size:2.4rem;font-weight:700;background:linear-gradient(90deg,var(--accent),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.5rem;position:relative}
+.hero .subtitle{color:var(--fg2);font-size:1.1rem;position:relative}
+.hero .chip{display:inline-block;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:.25rem .85rem;font-size:.8rem;color:var(--accent);margin:.6rem .25rem 0;position:relative}
+
+/* ===== LAYOUT ===== */
+.container{max-width:1100px;margin:0 auto;padding:1.5rem}
+@media(max-width:768px){.container{padding:1rem .75rem}}
+
+/* ===== TOC ===== */
+.toc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem 2rem;margin-bottom:2rem}
+.toc h2{color:var(--accent);font-size:1.3rem;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.toc h2::before{content:'📑';font-size:1.2rem}
+.toc ol{padding-left:1.5rem}
+.toc li{margin:.35rem 0}
+.toc li a{color:var(--fg);font-size:.95rem}
+.toc li a:hover{color:var(--accent)}
+
+/* ===== SECTIONS ===== */
+.section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1.5rem;overflow:hidden;transition:box-shadow var(--transition)}
+.section:hover{box-shadow:0 0 20px rgba(88,166,255,.05)}
+.section-header{padding:1.25rem 1.5rem;cursor:default}
+.section-header h2{font-size:1.35rem;color:var(--accent);display:flex;align-items:center;gap:.6rem}
+.section-body{padding:0 1.5rem 1.5rem}
+
+/* ===== COLLAPSIBLE ===== */
+details{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);margin:.75rem 0;overflow:hidden;transition:background var(--transition)}
+details[open]{background:var(--bg3)}
+summary{padding:.85rem 1.1rem;cursor:pointer;font-weight:600;color:var(--accent2);user-select:none;display:flex;align-items:center;gap:.5rem;list-style:none;transition:background var(--transition)}
+summary::-webkit-details-marker{display:none}
+summary::before{content:'▶';font-size:.7rem;transition:transform var(--transition);display:inline-block;color:var(--fg2)}
+details[open] summary::before{transform:rotate(90deg)}
+summary:hover{background:var(--bg4)}
+details .detail-body{padding:.75rem 1.1rem}
+
+/* ===== CODE ===== */
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.25rem;overflow-x:auto;font-size:.82rem;line-height:1.65;margin:.75rem 0}
+code{font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace}
+pre code{color:var(--fg)}
+.line-num{color:var(--fg2);user-select:none;display:inline-block;min-width:2.5em;text-align:right;margin-right:1em;opacity:.5}
+/* Syntax highlighting */
+.kw{color:var(--purple);font-weight:600}
+.reg{color:var(--orange)}
+.num{color:var(--green)}
+.cmt{color:var(--fg2);font-style:italic}
+.lbl{color:var(--pink);font-weight:600}
+.dir{color:var(--yellow)}
+.str{color:var(--cyan)}
+
+/* ===== TABLES ===== */
+table{width:100%;border-collapse:collapse;margin:.75rem 0;font-size:.88rem}
+th,td{padding:.6rem .85rem;border:1px solid var(--border);text-align:left}
+th{background:var(--bg4);color:var(--accent);font-weight:600;white-space:nowrap}
+td{color:var(--fg)}
+tr:nth-child(even){background:rgba(255,255,255,.02)}
+tr:hover{background:rgba(88,166,255,.04)}
+.small-table{max-width:600px}
+
+/* ===== DIAGRAMS ===== */
+.flow-diagram{display:flex;flex-direction:column;align-items:center;gap:0;margin:1.5rem 0}
+.flow-box{background:var(--bg4);border:1px solid var(--border);border-radius:var(--radius);padding:.7rem 1.4rem;text-align:center;color:var(--fg);font-size:.9rem;min-width:180px;position:relative;transition:border-color var(--transition)}
+.flow-box:hover{border-color:var(--accent)}
+.flow-box.start{border-color:var(--green);background:rgba(63,185,80,.08)}
+.flow-box.decision{transform:rotate(0deg);border-color:var(--yellow);background:rgba(210,153,34,.08);border-radius:4px;clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);padding:1.5rem 2.5rem;min-width:auto}
+.flow-box.process{border-color:var(--accent);background:rgba(88,166,255,.06)}
+.flow-box.end{border-color:var(--red);background:rgba(248,81,73,.08);border-radius:20px}
+.flow-arrow{width:2px;height:28px;background:var(--fg2);position:relative}
+.flow-arrow::after{content:'▼';position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:.55rem;color:var(--fg2)}
+.flow-row{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;justify-content:center}
+.flow-label{font-size:.75rem;color:var(--fg2);font-style:italic}
+
+/* Horizontal state machine */
+.state-machine{display:flex;align-items:center;gap:0;overflow-x:auto;padding:1rem 0;margin:1rem 0}
+.state{background:var(--bg4);border:2px solid var(--border);border-radius:var(--radius);padding:.6rem 1rem;text-align:center;font-size:.82rem;color:var(--fg);white-space:nowrap;min-width:100px}
+.state.active{border-color:var(--green);color:var(--green)}
+.state-arrow{color:var(--fg2);font-size:1.2rem;margin:0 .1rem;flex-shrink:0}
+
+/* ===== CALLOUT ===== */
+.callout{border-left:3px solid var(--accent);background:rgba(88,166,255,.05);padding:.85rem 1.1rem;border-radius:0 var(--radius) var(--radius) 0;margin:.75rem 0;font-size:.92rem}
+.callout.warn{border-left-color:var(--yellow);background:rgba(210,153,34,.05)}
+.callout.danger{border-left-color:var(--red);background:rgba(248,81,73,.05)}
+.callout.success{border-left-color:var(--green);background:rgba(63,185,80,.05)}
+.callout strong{color:var(--accent2)}
+
+/* ===== BADGES ===== */
+.badge{display:inline-block;padding:.15rem .55rem;border-radius:10px;font-size:.72rem;font-weight:600;margin:0 .15rem;vertical-align:middle}
+.badge-green{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3)}
+.badge-blue{background:rgba(88,166,255,.15);color:var(--accent);border:1px solid rgba(88,166,255,.3)}
+.badge-yellow{background:rgba(210,153,34,.15);color:var(--yellow);border:1px solid rgba(210,153,34,.3)}
+.badge-red{background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3)}
+.badge-purple{background:rgba(188,140,255,.15);color:var(--purple);border:1px solid rgba(188,140,255,.3)}
+
+/* ===== FOOTER ===== */
+.footer{text-align:center;padding:2rem;color:var(--fg2);font-size:.8rem;border-top:1px solid var(--border);margin-top:2rem}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:600px){
+  .hero h1{font-size:1.6rem}
+  .section-body{padding:0 1rem 1rem}
+  pre{font-size:.75rem;padding:.75rem}
+  .state-machine{flex-wrap:wrap}
+  .flow-box.decision{padding:1.2rem 1.8rem}
+}
+
+/* ===== SCROLL TO TOP ===== */
+#scrollTop{position:fixed;bottom:2rem;right:2rem;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:1.2rem;display:none;align-items:center;justify-content:center;box-shadow:0 4px 15px rgba(88,166,255,.3);transition:transform var(--transition),opacity var(--transition);z-index:999}
+#scrollTop:hover{transform:scale(1.1)}
+
+/* Pseudo code styling */
+.pseudo{background:#0f1318;border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem;font-family:'Cascadia Code','Fira Code',monospace;font-size:.83rem;line-height:1.7;color:var(--fg);overflow-x:auto;margin:.75rem 0;white-space: pre-wrap;}
+.pseudo .keyword{color:var(--purple)}
+.pseudo .func{color:var(--accent)}
+.pseudo .comment{color:var(--fg2);font-style:italic}
+.pseudo .type{color:var(--orange)}
+.pseudo .val{color:var(--green)}
+</style>
+</head>
+<body>
+
+<!-- ===== HERO ===== -->
+<div class="hero">
+  <h1>🚦 ARM Assembly Deep Analysis</h1>
+  <div class="subtitle">Zebra Crossing Light Controller — STM32F446RE NUCLEO-64</div>
+  <div>
+    <span class="chip">ARM Cortex-M4</span>
+    <span class="chip">Thumb-2 ISA</span>
+    <span class="chip">TIM2 / TIM3 PWM</span>
+    <span class="chip">7-Segment Mux</span>
+    <span class="chip">1169 Lines</span>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ===== TABLE OF CONTENTS ===== -->
+<nav class="toc" id="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#sec1">Overview</a></li>
+    <li><a href="#sec2">Program Structure</a></li>
+    <li><a href="#sec3">Line-by-Line Explanation</a></li>
+    <li><a href="#sec4">ARM Concepts Used</a></li>
+    <li><a href="#sec5">Register Tracking</a></li>
+    <li><a href="#sec6">Control Flow Analysis</a></li>
+    <li><a href="#sec7">Data Flow Analysis</a></li>
+    <li><a href="#sec8">Execution Walkthrough</a></li>
+    <li><a href="#sec9">Decompiled High-Level Pseudocode</a></li>
+    <li><a href="#sec10">Important Observations</a></li>
+  </ol>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 1: OVERVIEW                                        -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section" id="sec1">
+  <div class="section-header"><h2>1️⃣ Overview</h2></div>
+  <div class="section-body">
+
+    <h3>What the Program Does</h3>
+    <p>This is a <strong>bare-metal ARM Cortex-M4 firmware</strong> for a <strong>pedestrian zebra crossing traffic light controller</strong> running on the <strong>STM32F446RE NUCLEO-64</strong> development board. It operates without an operating system, directly manipulating hardware registers.</p>
+
+    <h3 style="margin-top:1rem">High-Level Behavior</h3>
+    <div class="state-machine">
+      <div class="state active">IDLE<br><small>RED on, "STOP"</small></div>
+      <span class="state-arrow">→</span>
+      <div class="state">BUTTON<br><small>Pressed</small></div>
+      <span class="state-arrow">→</span>
+      <div class="state">WARNING<br><small>YELLOW 1s</small></div>
+      <span class="state-arrow">→</span>
+      <div class="state">CROSSING<br><small>GREEN 60s</small></div>
+      <span class="state-arrow">→</span>
+      <div class="state">SHOW 00<br><small>1s pause</small></div>
+      <span class="state-arrow">→</span>
+      <div class="state">END YELLOW<br><small>1s warn</small></div>
+      <span class="state-arrow">→</span>
+      <div class="state active">IDLE<br><small>loops</small></div>
+    </div>
+
+    <ul style="margin-top:1rem">
+      <li><strong>Idle State:</strong> Pedestrian RED LED is on. Seven-segment displays show "STOP". Waits for button press.</li>
+      <li><strong>Warning Phase:</strong> YELLOW LED turns on for 1 second to warn traffic.</li>
+      <li><strong>Crossing Phase:</strong> GREEN LED turns on (via PWM for brightness control). A 60-second countdown is displayed on two 7-segment digits, alongside "GO" on four word-display digits. A buzzer beeps intermittently. During the last 10 seconds, the green LED blinks in a 2-second ON / 2-second OFF pattern.</li>
+      <li><strong>Button Reset:</strong> If the button is pressed during crossing, the timer resets to 60 seconds.</li>
+      <li><strong>End Crossing:</strong> Displays "00" for 1 second, then shows YELLOW for 1 second, then returns to IDLE.</li>
+      <li><strong>Day/Night Mode:</strong> An independent timer toggles day/night mode every 10 seconds. In DAY mode, the green LED runs at full PWM brightness (999/999). In NIGHT mode, it runs dim (120/999).</li>
+    </ul>
+
+    <h3 style="margin-top:1rem">Main Concepts Used</h3>
+    <table>
+      <tr><th>Concept</th><th>Implementation</th></tr>
+      <tr><td>Hardware Timers</td><td>TIM2 for 1 ms tick counting; TIM3 for PWM output</td></tr>
+      <tr><td>PWM LED Dimming</td><td>TIM3 Channel 1 on PB4 (AF2) with 1 kHz frequency</td></tr>
+      <tr><td>Multiplexed 7-Segment</td><td>6 displays (2 countdown + 4 word) sharing segment pins via time-division multiplexing</td></tr>
+      <tr><td>GPIO Bit Manipulation</td><td>Direct register read-modify-write via LDR/ORR/BIC/STR</td></tr>
+      <tr><td>Software State Machine</td><td>Label-based states with branch instructions</td></tr>
+      <tr><td>Polled I/O</td><td>Button input read via GPIO IDR register polling (no interrupts)</td></tr>
+      <tr><td>Conditional Execution</td><td>ARM conditional suffixes (ORRNE, BICNE) for segment mapping</td></tr>
+    </table>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 2: PROGRAM STRUCTURE                               -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section" id="sec2">
+  <div class="section-header"><h2>2️⃣ Program Structure</h2></div>
+  <div class="section-body">
+
+    <h3>Entry Point</h3>
+    <p>The program uses a minimal vector table. On reset, the processor loads the stack pointer from address 0x00000000 (set to <code>0x20020000</code>, top of 128 KB SRAM) and jumps to the <code>Reset_Handler</code> label.</p>
+    <pre><code><span class="dir">AREA</span> RESET, DATA, READONLY
+<span class="lbl">__Vectors</span>
+    <span class="dir">DCD</span>     <span class="num">0x20020000</span>        <span class="cmt">; Initial SP</span>
+    <span class="dir">DCD</span>     <span class="lbl">Reset_Handler</span>     <span class="cmt">; Reset vector</span></code></pre>
+
+    <h3 style="margin-top:1.5rem">Sections (Memory Areas)</h3>
+    <table>
+      <tr><th>AREA Name</th><th>Type</th><th>Attributes</th><th>Purpose</th></tr>
+      <tr><td><code>RESET</code></td><td>DATA</td><td>READONLY</td><td>Vector table (SP + Reset handler)</td></tr>
+      <tr><td><code>MYCODE</code></td><td>CODE</td><td>READONLY</td><td>All executable instructions (~1140 lines)</td></tr>
+      <tr><td><code>MYDATA</code></td><td>DATA</td><td>READONLY</td><td>Segment lookup table (10 bytes)</td></tr>
+      <tr><td><code>MYVARS</code></td><td>DATA</td><td>READWRITE</td><td>Runtime variables (6 × 4 = 24 bytes in RAM)</td></tr>
+    </table>
+
+    <h3 style="margin-top:1.5rem">Functions / Labels</h3>
+    <table>
+      <tr><th>Label</th><th>Type</th><th>Lines</th><th>Purpose</th></tr>
+      <tr><td><code>Reset_Handler</code></td><td>Entry</td><td>143–310</td><td>Clock/GPIO/Timer init, variable init, branch to IDLE</td></tr>
+      <tr><td><code>IDLE</code></td><td>State</td><td>315–343</td><td>Red ON, buzzer/green OFF, display STOP, poll button</td></tr>
+      <tr><td><code>START_WARNING</code></td><td>State</td><td>348–378</td><td>Yellow ON for 1 second</td></tr>
+      <tr><td><code>CROSSING_START</code></td><td>State</td><td>383–487</td><td>Main 60-second crossing countdown loop</td></tr>
+      <tr><td><code>END_CROSSING</code></td><td>State</td><td>492–534</td><td>Show 00, then yellow, then return to IDLE</td></tr>
+      <tr><td><code>UPDATE_TIMERS</code></td><td>Function</td><td>539–606</td><td>Accumulate TIM2 delta, update day/night & crossing timers</td></tr>
+      <tr><td><code>RESET_CROSS_TIMER_ONLY</code></td><td>Function</td><td>611–628</td><td>Zero out crossing accumulator and second flag</td></tr>
+      <tr><td><code>CONSUME_SECOND_FLAG</code></td><td>Function</td><td>634–653</td><td>Atomically consume one second tick; returns 0 or 1</td></tr>
+      <tr><td><code>GREEN_PWM_CURRENT_MODE</code></td><td>Function</td><td>658–676</td><td>Set green PWM based on day/night mode</td></tr>
+      <tr><td><code>DISPLAY_STOP_ONCE</code></td><td>Function</td><td>681–697</td><td>Multiplex "STOP" across 4 word digits</td></tr>
+      <tr><td><code>DISPLAY_GO_ONCE</code></td><td>Function</td><td>702–718</td><td>Multiplex "GO" across 4 word digits (blanks + G + O)</td></tr>
+      <tr><td><code>DISPLAY_COUNT_GO_ONCE</code></td><td>Function</td><td>723–747</td><td>Show countdown number + "GO" in one mux pass</td></tr>
+      <tr><td><code>SHOW_COUNT_DIG1/DIG2</code></td><td>Function</td><td>752–789</td><td>Show tens/ones digit on countdown display</td></tr>
+      <tr><td><code>SHOW_WORD_DIG1-4</code></td><td>Function</td><td>794–869</td><td>Show individual word display digits</td></tr>
+      <tr><td><code>SET_SEGMENTS_CC</code></td><td>Function</td><td>874–937</td><td>Set segment pins for common-cathode display</td></tr>
+      <tr><td><code>SET_SEGMENTS_CA</code></td><td>Function</td><td>942–994</td><td>Set segment pins for common-anode display (inverted logic)</td></tr>
+      <tr><td><code>ALL_DIGITS_OFF</code></td><td>Function</td><td>999–1021</td><td>Disable all digit select pins</td></tr>
+      <tr><td><code>DISPLAY_ALL_OFF</code></td><td>Function</td><td>1026–1051</td><td>Disable all digits AND all segments</td></tr>
+      <tr><td><code>GREEN_PWM_FULL/DIM/OFF</code></td><td>Function</td><td>1056–1084</td><td>Set TIM3 CCR1 to 999/120/0</td></tr>
+      <tr><td><code>BUZZER_ON/OFF</code></td><td>Function</td><td>1089–1109</td><td>Toggle PA9 buzzer pin</td></tr>
+      <tr><td><code>SHORT_DELAY</code></td><td>Function</td><td>1114–1124</td><td>Busy-wait ~3000 loop iterations (mux stabilization)</td></tr>
+      <tr><td><code>DELAY_SHORT</code></td><td>Function</td><td>1129–1139</td><td>Busy-wait ~250000 iterations (button debounce)</td></tr>
+    </table>
+
+    <h3 style="margin-top:1.5rem">Memory Layout</h3>
+    <pre><code><span class="cmt">; Flash (0x0800_0000+)</span>
+<span class="cmt">; ┌───────────────────────────────────┐</span>
+<span class="cmt">; │ RESET area (Vector Table)         │  8 bytes</span>
+<span class="cmt">; │   [0] Initial SP = 0x20020000    │</span>
+<span class="cmt">; │   [4] Reset_Handler address      │</span>
+<span class="cmt">; ├───────────────────────────────────┤</span>
+<span class="cmt">; │ MYCODE area (all instructions)    │  ~4 KB</span>
+<span class="cmt">; │   + Literal pools (LTORG)         │</span>
+<span class="cmt">; ├───────────────────────────────────┤</span>
+<span class="cmt">; │ MYDATA area (SEG_TABLE)           │  10 bytes</span>
+<span class="cmt">; └───────────────────────────────────┘</span>
+<span class="cmt">;</span>
+<span class="cmt">; SRAM (0x2000_0000 – 0x2001_FFFF)</span>
+<span class="cmt">; ┌───────────────────────────────────┐</span>
+<span class="cmt">; │ MYVARS area                       │  24 bytes</span>
+<span class="cmt">; │   LAST_TIM2_COUNT  (4 bytes)      │</span>
+<span class="cmt">; │   DAYNIGHT_ACC     (4 bytes)      │</span>
+<span class="cmt">; │   CROSS_ACC        (4 bytes)      │</span>
+<span class="cmt">; │   SECOND_FLAG      (4 bytes)      │</span>
+<span class="cmt">; │   CROSS_ACTIVE     (4 bytes)      │</span>
+<span class="cmt">; │   MODE_FLAG        (4 bytes)      │</span>
+<span class="cmt">; ├───────────────────────────────────┤</span>
+<span class="cmt">; │           ...                     │</span>
+<span class="cmt">; ├───────────────────────────────────┤</span>
+<span class="cmt">; │ Stack (grows downward)            │</span>
+<span class="cmt">; │ SP initial = 0x20020000           │</span>
+<span class="cmt">; └───────────────────────────────────┘</span></code></pre>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 3: LINE-BY-LINE EXPLANATION                        -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section" id="sec3">
+  <div class="section-header"><h2>3️⃣ Line-by-Line Explanation</h2></div>
+  <div class="section-body">
+
+    <p>Every meaningful instruction is explained below, grouped by logical blocks. Click any block to expand.</p>
+
+    <!-- ===== 3.1 Directives & Vector Table ===== -->
+    <details>
+      <summary>Lines 27–35 — Assembler Directives & Vector Table</summary>
+      <div class="detail-body">
+<pre><code><span class="line-num">27</span><span class="dir">PRESERVE8</span>           <span class="cmt">; Guarantee 8-byte stack alignment (ARM AAPCS requirement)</span>
+<span class="line-num">28</span><span class="dir">THUMB</span>               <span class="cmt">; Use Thumb-2 instruction set (Cortex-M only supports Thumb)</span>
+<span class="line-num">30</span><span class="dir">AREA</span> RESET, DATA, READONLY   <span class="cmt">; Declare a read-only data section named RESET</span>
+<span class="line-num">31</span><span class="dir">EXPORT</span> __Vectors    <span class="cmt">; Make __Vectors visible to the linker</span>
+<span class="line-num">33</span><span class="lbl">__Vectors</span>
+<span class="line-num">34</span>    <span class="dir">DCD</span>  <span class="num">0x20020000</span>  <span class="cmt">; Word 0: Initial Stack Pointer (top of 128KB SRAM)</span>
+<span class="line-num">35</span>    <span class="dir">DCD</span>  <span class="lbl">Reset_Handler</span> <span class="cmt">; Word 1: Reset vector (address of first instruction)</span></code></pre>
+        <table>
+          <tr><th>Instruction</th><th>Explanation</th></tr>
+          <tr><td><code>PRESERVE8</code></td><td>Tells the linker this module maintains 8-byte stack alignment, as required by the ARM Architecture Procedure Call Standard (AAPCS). The Cortex-M hardware also requires this for proper exception handling.</td></tr>
+          <tr><td><code>THUMB</code></td><td>Selects the Thumb instruction set. Cortex-M processors only execute Thumb (16/32-bit mixed) instructions — ARM (32-bit fixed) mode is not available.</td></tr>
+          <tr><td><code>DCD 0x20020000</code></td><td>Defines a 32-bit constant (Define Constant Data). The Cortex-M processor reads the first word of the vector table as the initial value for the Stack Pointer (SP). <code>0x20020000</code> is the end of the STM32F446RE's 128 KB SRAM region (0x20000000 + 0x20000).</td></tr>
+          <tr><td><code>DCD Reset_Handler</code></td><td>The second word is the Reset vector — the address jumped to after reset. The linker will resolve <code>Reset_Handler</code> to an absolute address with bit 0 set (Thumb bit).</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <!-- ===== 3.2 EQU Constants ===== -->
+    <details>
+      <summary>Lines 40–134 — Register Addresses & Constants (EQU)</summary>
+      <div class="detail-body">
+        <p>All <code>EQU</code> directives define symbolic constants resolved at assembly time. They generate no machine code — they are compile-time aliases.</p>
+        <table>
+          <tr><th>Symbol</th><th>Value</th><th>Purpose</th></tr>
+          <tr><td><code>RCC_AHB1ENR</code></td><td>0x40023830</td><td>RCC clock enable register for AHB1 bus (GPIO ports)</td></tr>
+          <tr><td><code>RCC_APB1ENR</code></td><td>0x40023840</td><td>RCC clock enable register for APB1 bus (TIM2, TIM3)</td></tr>
+          <tr><td><code>GPIOA_MODER</code></td><td>0x40020000</td><td>Port A mode register (input/output/AF/analog per pin)</td></tr>
+          <tr><td><code>GPIOA_IDR</code></td><td>0x40020010</td><td>Port A input data register (read button state)</td></tr>
+          <tr><td><code>GPIOA_ODR</code></td><td>0x40020014</td><td>Port A output data register (set/clear output pins)</td></tr>
+          <tr><td><code>GPIOA_PUPDR</code></td><td>0x4002000C</td><td>Port A pull-up/pull-down register</td></tr>
+          <tr><td><code>GPIOB_MODER</code></td><td>0x40020400</td><td>Port B mode register</td></tr>
+          <tr><td><code>GPIOB_ODR</code></td><td>0x40020414</td><td>Port B output data register</td></tr>
+          <tr><td><code>GPIOB_AFRL</code></td><td>0x40020420</td><td>Port B alternate function low register (pins 0-7)</td></tr>
+          <tr><td><code>GPIOC_MODER</code></td><td>0x40020800</td><td>Port C mode register</td></tr>
+          <tr><td><code>GPIOC_ODR</code></td><td>0x40020814</td><td>Port C output data register</td></tr>
+          <tr><td colspan="3" style="background:var(--bg3);color:var(--accent)"><strong>TIM2 Registers (1 ms tick timer)</strong></td></tr>
+          <tr><td><code>TIM2_CR1</code></td><td>0x40000000</td><td>Control register 1 (enable timer)</td></tr>
+          <tr><td><code>TIM2_EGR</code></td><td>0x40000014</td><td>Event generation register (force update)</td></tr>
+          <tr><td><code>TIM2_CNT</code></td><td>0x40000024</td><td>Counter register (current tick count)</td></tr>
+          <tr><td><code>TIM2_PSC</code></td><td>0x40000028</td><td>Prescaler (divides clock)</td></tr>
+          <tr><td><code>TIM2_ARR</code></td><td>0x4000002C</td><td>Auto-reload register (max count)</td></tr>
+          <tr><td colspan="3" style="background:var(--bg3);color:var(--accent)"><strong>TIM3 Registers (PWM for green LED)</strong></td></tr>
+          <tr><td><code>TIM3_CR1</code></td><td>0x40000400</td><td>Control register 1</td></tr>
+          <tr><td><code>TIM3_CCMR1</code></td><td>0x40000418</td><td>Capture/compare mode register 1</td></tr>
+          <tr><td><code>TIM3_CCER</code></td><td>0x40000420</td><td>Capture/compare enable register</td></tr>
+          <tr><td><code>TIM3_PSC</code></td><td>0x40000428</td><td>Prescaler</td></tr>
+          <tr><td><code>TIM3_ARR</code></td><td>0x4000042C</td><td>Auto-reload (999 → 1 kHz PWM frequency)</td></tr>
+          <tr><td><code>TIM3_CCR1</code></td><td>0x40000434</td><td>Capture/compare register (duty cycle value)</td></tr>
+          <tr><td colspan="3" style="background:var(--bg3);color:var(--accent)"><strong>Pin Bitmasks</strong></td></tr>
+          <tr><td><code>PA6_BUTTON</code></td><td>1 &lt;&lt; 6 = 0x40</td><td>Button input pin</td></tr>
+          <tr><td><code>PA9_BUZZER</code></td><td>1 &lt;&lt; 9 = 0x200</td><td>Buzzer output pin</td></tr>
+          <tr><td><code>PB3_RED</code></td><td>1 &lt;&lt; 3 = 0x08</td><td>Red LED</td></tr>
+          <tr><td><code>PB4_GREEN_PWM</code></td><td>1 &lt;&lt; 4 = 0x10</td><td>Green LED (PWM via TIM3)</td></tr>
+          <tr><td><code>PB5_YELLOW</code></td><td>1 &lt;&lt; 5 = 0x20</td><td>Yellow LED</td></tr>
+          <tr><td colspan="3" style="background:var(--bg3);color:var(--accent)"><strong>Timing Constants</strong></td></tr>
+          <tr><td><code>CROSS_TIME</code></td><td>60</td><td>Crossing duration in seconds</td></tr>
+          <tr><td><code>BLINK_START</code></td><td>10</td><td>Start blinking green at this many seconds remaining</td></tr>
+          <tr><td><code>ONE_SECOND_MS</code></td><td>1000</td><td>Milliseconds in one second</td></tr>
+          <tr><td><code>DAYNIGHT_PERIOD_MS</code></td><td>10000</td><td>Day/night toggle period (prototype: 10s)</td></tr>
+          <tr><td><code>MUX_DELAY</code></td><td>3000</td><td>Loop count for display mux stabilization delay</td></tr>
+          <tr><td><code>DEBOUNCE_DELAY</code></td><td>250000</td><td>Loop count for button debounce delay</td></tr>
+          <tr><td><code>PWM_FULL</code></td><td>999</td><td>Full brightness (100% duty cycle)</td></tr>
+          <tr><td><code>PWM_DIM</code></td><td>120</td><td>Dim brightness (~12% duty cycle)</td></tr>
+          <tr><td><code>PWM_OFF</code></td><td>0</td><td>LED off (0% duty cycle)</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <!-- ===== 3.3 Reset Handler: Clock Enable ===== -->
+    <details>
+      <summary>Lines 143–162 — Reset_Handler: Clock Initialization</summary>
+      <div class="detail-body">
+<pre><code><span class="line-num">143</span><span class="lbl">Reset_Handler</span>
+<span class="line-num">148</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">RCC_AHB1ENR</span>       <span class="cmt">; R0 = 0x40023830</span>
+<span class="line-num">149</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]              <span class="cmt">; R1 = current AHB1ENR value</span>
+<span class="line-num">150</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #(<span class="num">1</span> &lt;&lt; <span class="num">0</span>)     <span class="cmt">; Set bit 0 → enable GPIOA clock</span>
+<span class="line-num">151</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #(<span class="num">1</span> &lt;&lt; <span class="num">1</span>)     <span class="cmt">; Set bit 1 → enable GPIOB clock</span>
+<span class="line-num">152</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #(<span class="num">1</span> &lt;&lt; <span class="num">2</span>)     <span class="cmt">; Set bit 2 → enable GPIOC clock</span>
+<span class="line-num">153</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]              <span class="cmt">; Write back to AHB1ENR</span>
+<span class="line-num">158</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">RCC_APB1ENR</span>       <span class="cmt">; R0 = 0x40023840</span>
+<span class="line-num">159</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]              <span class="cmt">; R1 = current APB1ENR value</span>
+<span class="line-num">160</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #(<span class="num">1</span> &lt;&lt; <span class="num">0</span>)     <span class="cmt">; Set bit 0 → enable TIM2 clock</span>
+<span class="line-num">161</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #(<span class="num">1</span> &lt;&lt; <span class="num">1</span>)     <span class="cmt">; Set bit 1 → enable TIM3 clock</span>
+<span class="line-num">162</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]              <span class="cmt">; Write back to APB1ENR</span></code></pre>
+        <div class="callout">
+          <strong>Why read-modify-write?</strong> The ORR pattern (<code>LDR → ORR → STR</code>) preserves other bits in the register. If we just wrote the desired bits directly, we would clear all other peripheral clocks. This is the standard STM32 register manipulation pattern.
+        </div>
+        <p><strong>Registers affected:</strong> R0 = register address, R1 = register value. After this block, GPIOA/B/C and TIM2/TIM3 clocks are enabled.</p>
+      </div>
+    </details>
+
+    <!-- ===== 3.4 GPIO Configuration ===== -->
+    <details>
+      <summary>Lines 167–225 — GPIO Port Configuration (A, B, C)</summary>
+      <div class="detail-body">
+        <h4>Port A Configuration (Lines 167–185)</h4>
+<pre><code><span class="line-num">167</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">GPIOA_MODER</span>
+<span class="line-num">168</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">171</span>    <span class="kw">LDR</span>     <span class="reg">R2</span>, =<span class="num">0x003FF00F</span>       <span class="cmt">; Mask for PA0,PA1,PA6,PA7,PA8,PA9,PA10</span>
+<span class="line-num">172</span>    <span class="kw">BIC</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, <span class="reg">R2</span>           <span class="cmt">; Clear those pin mode bits</span>
+<span class="line-num">176</span>    <span class="kw">LDR</span>     <span class="reg">R2</span>, =<span class="num">0x00154005</span>       <span class="cmt">; Set output mode for PA0,1,7,8,9,10</span>
+<span class="line-num">177</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, <span class="reg">R2</span>           <span class="cmt">; PA6 left as 00 = input</span>
+<span class="line-num">178</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]</code></pre>
+        <p>The MODER register uses 2 bits per pin: <code>00</code>=Input, <code>01</code>=Output, <code>10</code>=Alternate Function, <code>11</code>=Analog.</p>
+        <table class="small-table">
+          <tr><th>Pin</th><th>MODER bits</th><th>Mode</th><th>Function</th></tr>
+          <tr><td>PA0</td><td>01</td><td>Output</td><td>STOP/GO DIG1</td></tr>
+          <tr><td>PA1</td><td>01</td><td>Output</td><td>STOP/GO DIG2</td></tr>
+          <tr><td>PA6</td><td>00</td><td>Input</td><td>Button (with pull-down)</td></tr>
+          <tr><td>PA7</td><td>01</td><td>Output</td><td>Segment G</td></tr>
+          <tr><td>PA8</td><td>01</td><td>Output</td><td>Segment D</td></tr>
+          <tr><td>PA9</td><td>01</td><td>Output</td><td>Buzzer</td></tr>
+          <tr><td>PA10</td><td>01</td><td>Output</td><td>Segment E</td></tr>
+        </table>
+
+<pre><code><span class="line-num">181</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">GPIOA_PUPDR</span>
+<span class="line-num">182</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">183</span>    <span class="kw">BIC</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">0x00003000</span>  <span class="cmt">; Clear PA6 PUPDR bits [13:12]</span>
+<span class="line-num">184</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">0x00002000</span>  <span class="cmt">; Set bit 13 → 10 = pull-down on PA6</span>
+<span class="line-num">185</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]</code></pre>
+        <p>PUPDR encoding: <code>00</code>=No pull, <code>01</code>=Pull-up, <code>10</code>=Pull-down. The button is active-high with internal pull-down, so reading a <code>1</code> means pressed.</p>
+
+        <h4 style="margin-top:1rem">Port B Configuration (Lines 190–210)</h4>
+<pre><code><span class="line-num">190</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">GPIOB_MODER</span>
+<span class="line-num">191</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">194</span>    <span class="kw">LDR</span>     <span class="reg">R2</span>, =<span class="num">0x003F3FC3</span>       <span class="cmt">; Mask PB0,3,4,5,6,8,9,10</span>
+<span class="line-num">195</span>    <span class="kw">BIC</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, <span class="reg">R2</span>
+<span class="line-num">199</span>    <span class="kw">LDR</span>     <span class="reg">R2</span>, =<span class="num">0x00151641</span>       <span class="cmt">; PB4=AF(10), others=Output(01)</span>
+<span class="line-num">200</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, <span class="reg">R2</span>
+<span class="line-num">201</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]</code></pre>
+        <p>PB4 is set to Alternate Function mode (<code>10</code>) because it is driven by TIM3 Channel 1 for PWM output. All other Port B pins used are general-purpose outputs.</p>
+
+<pre><code><span class="line-num">204</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">GPIOB_AFRL</span>       <span class="cmt">; Alternate Function Low Register</span>
+<span class="line-num">205</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">206</span>    <span class="kw">LDR</span>     <span class="reg">R2</span>, =<span class="num">0x000F0000</span>       <span class="cmt">; Mask bits [19:16] for PB4</span>
+<span class="line-num">207</span>    <span class="kw">BIC</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, <span class="reg">R2</span>
+<span class="line-num">208</span>    <span class="kw">LDR</span>     <span class="reg">R2</span>, =<span class="num">0x00020000</span>       <span class="cmt">; AF2 = 0010 → TIM3_CH1</span>
+<span class="line-num">209</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, <span class="reg">R2</span>
+<span class="line-num">210</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]</code></pre>
+        <p>AFRL has 4 bits per pin (pins 0–7). PB4 uses bits [19:16]. Setting to <code>0010</code> (AF2) maps PB4 to TIM3_CH1 — the PWM output channel.</p>
+
+        <h4 style="margin-top:1rem">Port C Configuration (Lines 215–225)</h4>
+<pre><code><span class="line-num">215</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">GPIOC_MODER</span>
+<span class="line-num">219</span>    <span class="kw">LDR</span>     <span class="reg">R2</span>, =<span class="num">0x0000C00F</span>       <span class="cmt">; Mask PC0, PC1, PC7</span>
+<span class="line-num">223</span>    <span class="kw">LDR</span>     <span class="reg">R2</span>, =<span class="num">0x00004005</span>       <span class="cmt">; All output mode (01)</span></code></pre>
+        <p>PC0 = Segment A, PC1 = Segment B, PC7 = STOP/GO Digit 3. All configured as outputs.</p>
+      </div>
+    </details>
+
+    <!-- ===== 3.5 Timer Configuration ===== -->
+    <details>
+      <summary>Lines 230–279 — Timer Configuration (TIM2 & TIM3)</summary>
+      <div class="detail-body">
+        <h4>TIM2 — 1 ms Tick Timer</h4>
+<pre><code><span class="line-num">230</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM2_PSC</span>
+<span class="line-num">231</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, =<span class="num">15999</span>            <span class="cmt">; Prescaler: 16 MHz / (15999+1) = 1 kHz</span>
+<span class="line-num">232</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">234</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM2_ARR</span>
+<span class="line-num">235</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, =<span class="num">0xFFFFFFFF</span>       <span class="cmt">; Max auto-reload (TIM2 is 32-bit)</span>
+<span class="line-num">236</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">238</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM2_CNT</span>
+<span class="line-num">239</span>    <span class="kw">MOV</span>     <span class="reg">R1</span>, #<span class="num">0</span>              <span class="cmt">; Reset counter to 0</span>
+<span class="line-num">240</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">242</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM2_EGR</span>
+<span class="line-num">243</span>    <span class="kw">MOV</span>     <span class="reg">R1</span>, #<span class="num">1</span>              <span class="cmt">; UG bit → force update event</span>
+<span class="line-num">244</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">246</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM2_CR1</span>
+<span class="line-num">247</span>    <span class="kw">MOV</span>     <span class="reg">R1</span>, #<span class="num">1</span>              <span class="cmt">; CEN bit → enable counter</span>
+<span class="line-num">248</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]</code></pre>
+        <div class="callout success">
+          <strong>Timer Math:</strong> The STM32F446RE's default internal oscillator (HSI) runs at 16 MHz. With prescaler = 15999, the timer increments at 16,000,000 / (15,999 + 1) = <strong>1000 Hz = 1 ms per tick</strong>. TIM2 is a 32-bit timer, so it counts up to ~4.29 billion ms (≈49.7 days) before wrapping.
+        </div>
+
+        <h4 style="margin-top:1rem">TIM3 — PWM on PB4 (Green LED)</h4>
+<pre><code><span class="line-num">253</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM3_PSC</span>
+<span class="line-num">254</span>    <span class="kw">MOV</span>     <span class="reg">R1</span>, #<span class="num">15</span>             <span class="cmt">; Prescaler: 16 MHz / (15+1) = 1 MHz</span>
+<span class="line-num">257</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM3_ARR</span>
+<span class="line-num">258</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, =<span class="num">999</span>            <span class="cmt">; Period: 1 MHz / (999+1) = 1 kHz PWM</span>
+<span class="line-num">261</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM3_CCR1</span>
+<span class="line-num">262</span>    <span class="kw">MOV</span>     <span class="reg">R1</span>, #<span class="num">0</span>              <span class="cmt">; Initial duty cycle = 0 (LED off)</span>
+<span class="line-num">265</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM3_CCMR1</span>
+<span class="line-num">266</span>    <span class="kw">MOV</span>     <span class="reg">R1</span>, #<span class="num">0x68</span>           <span class="cmt">; OC1M=110 (PWM Mode 1) + OC1PE=1 (preload)</span>
+<span class="line-num">269</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM3_CCER</span>
+<span class="line-num">270</span>    <span class="kw">MOV</span>     <span class="reg">R1</span>, #<span class="num">0x01</span>           <span class="cmt">; CC1E=1 → enable CH1 output</span>
+<span class="line-num">277</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM3_CR1</span>
+<span class="line-num">278</span>    <span class="kw">MOV</span>     <span class="reg">R1</span>, #<span class="num">0x81</span>           <span class="cmt">; ARPE=1 + CEN=1 → auto-reload preload + enable</span></code></pre>
+        <div class="callout">
+          <strong>CCMR1 = 0x68:</strong> Bits [6:4] = 110 → PWM Mode 1 (output high when CNT &lt; CCR1). Bit 3 (OC1PE) = 1 → preload enable (new CCR1 values take effect at next update event, preventing glitches).
+        </div>
+        <div class="callout">
+          <strong>CR1 = 0x81:</strong> Bit 7 (ARPE) = 1 → auto-reload preload. Bit 0 (CEN) = 1 → counter enabled. PWM frequency = 1 MHz / 1000 = <strong>1 kHz</strong>.
+        </div>
+      </div>
+    </details>
+
+    <!-- ===== 3.6 Variable Initialization ===== -->
+    <details>
+      <summary>Lines 284–310 — Variable Initialization</summary>
+      <div class="detail-body">
+<pre><code><span class="line-num">284</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">LAST_TIM2_COUNT</span>  <span class="cmt">; Address of LAST_TIM2_COUNT in RAM</span>
+<span class="line-num">285</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, =<span class="num">TIM2_CNT</span>        <span class="cmt">; Address of TIM2 counter register</span>
+<span class="line-num">286</span>    <span class="kw">LDR</span>     <span class="reg">R2</span>, [<span class="reg">R1</span>]             <span class="cmt">; Read current TIM2 count</span>
+<span class="line-num">287</span>    <span class="kw">STR</span>     <span class="reg">R2</span>, [<span class="reg">R0</span>]             <span class="cmt">; Store as last known count</span>
+<span class="line-num">289</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">DAYNIGHT_ACC</span>    <span class="cmt">; Day/night accumulator = 0</span>
+<span class="line-num">290</span>    <span class="kw">MOV</span>     <span class="reg">R1</span>, #<span class="num">0</span>
+<span class="line-num">291</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">293</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">CROSS_ACC</span>       <span class="cmt">; Crossing accumulator = 0</span>
+<span class="line-num">297</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">SECOND_FLAG</span>     <span class="cmt">; Second flag = 0</span>
+<span class="line-num">301</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">CROSS_ACTIVE</span>    <span class="cmt">; Crossing not active = 0</span>
+<span class="line-num">305</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">MODE_FLAG</span>       <span class="cmt">; Mode = 0 (DAY)</span>
+<span class="line-num">309</span>    <span class="kw">B</span>       <span class="lbl">IDLE</span>               <span class="cmt">; Jump to main idle loop</span>
+<span class="line-num">310</span>    <span class="dir">LTORG</span>                      <span class="cmt">; Emit literal pool here</span></code></pre>
+        <p>Each variable is zero-initialized. <code>LAST_TIM2_COUNT</code> is special — it captures the current TIM2 counter value so the first call to <code>UPDATE_TIMERS</code> computes a proper delta.</p>
+        <div class="callout warn">
+          <strong>LTORG directive:</strong> Forces the assembler to emit a literal pool at this location. Because <code>LDR Rn, =constant</code> generates a PC-relative load from a literal pool, the pool must be within ±4 KB of the instruction. Placing <code>LTORG</code> after branches ensures the pool doesn't get executed as code.
+        </div>
+      </div>
+    </details>
+
+    <!-- ===== 3.7 IDLE State ===== -->
+    <details>
+      <summary>Lines 315–343 — IDLE State & Button Polling</summary>
+      <div class="detail-body">
+<pre><code><span class="line-num">315</span><span class="lbl">IDLE</span>
+<span class="line-num">316</span>    <span class="kw">BL</span>      <span class="lbl">BUZZER_OFF</span>         <span class="cmt">; Turn off buzzer</span>
+<span class="line-num">317</span>    <span class="kw">BL</span>      <span class="lbl">GREEN_PWM_OFF</span>      <span class="cmt">; Set green LED duty cycle to 0</span>
+<span class="line-num">318</span>    <span class="kw">BL</span>      <span class="lbl">DISPLAY_ALL_OFF</span>    <span class="cmt">; Turn off all displays</span>
+<span class="line-num">321</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">CROSS_ACTIVE</span>
+<span class="line-num">322</span>    <span class="kw">MOV</span>     <span class="reg">R1</span>, #<span class="num">0</span>              <span class="cmt">; Mark crossing as inactive</span>
+<span class="line-num">323</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">326</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">GPIOB_ODR</span>      <span class="cmt">; Port B output register</span>
+<span class="line-num">327</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">328</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PB3_RED</span>    <span class="cmt">; Set bit 3 → RED LED ON</span>
+<span class="line-num">329</span>    <span class="kw">BIC</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PB5_YELLOW</span> <span class="cmt">; Clear bit 5 → YELLOW LED OFF</span>
+<span class="line-num">330</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">332</span><span class="lbl">WAIT_BUTTON</span>
+<span class="line-num">333</span>    <span class="kw">BL</span>      <span class="lbl">DISPLAY_STOP_ONCE</span>  <span class="cmt">; Show "STOP" (one mux pass)</span>
+<span class="line-num">334</span>    <span class="kw">BL</span>      <span class="lbl">UPDATE_TIMERS</span>      <span class="cmt">; Keep day/night timer running</span>
+<span class="line-num">335</span>    <span class="kw">BL</span>      <span class="lbl">GREEN_PWM_OFF</span>      <span class="cmt">; Ensure green stays off</span>
+<span class="line-num">337</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">GPIOA_IDR</span>      <span class="cmt">; Read Port A input</span>
+<span class="line-num">338</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">339</span>    <span class="kw">TST</span>     <span class="reg">R1</span>, #<span class="num">PA6_BUTTON</span>    <span class="cmt">; Test bit 6 — is button pressed?</span>
+<span class="line-num">340</span>    <span class="kw">BEQ</span>     <span class="lbl">WAIT_BUTTON</span>        <span class="cmt">; If zero (not pressed), loop back</span>
+<span class="line-num">342</span>    <span class="kw">BL</span>      <span class="lbl">DELAY_SHORT</span>        <span class="cmt">; Debounce delay (~250000 loops)</span>
+<span class="line-num">343</span>    <span class="kw">B</span>       <span class="lbl">START_WARNING</span>      <span class="cmt">; Proceed to warning phase</span></code></pre>
+        <p><code>TST</code> performs a bitwise AND and sets the Z flag. If bit 6 is 0 (button not pressed), Z=1 and <code>BEQ</code> branches back. When the button IS pressed, we debounce and proceed.</p>
+      </div>
+    </details>
+
+    <!-- ===== 3.8 Warning Phase ===== -->
+    <details>
+      <summary>Lines 348–378 — START_WARNING Phase</summary>
+      <div class="detail-body">
+<pre><code><span class="line-num">348</span><span class="lbl">START_WARNING</span>
+<span class="line-num">349</span>    <span class="kw">BL</span>      <span class="lbl">BUZZER_OFF</span>
+<span class="line-num">350</span>    <span class="kw">BL</span>      <span class="lbl">GREEN_PWM_OFF</span>
+<span class="line-num">354</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">CROSS_ACTIVE</span>
+<span class="line-num">355</span>    <span class="kw">MOV</span>     <span class="reg">R1</span>, #<span class="num">1</span>              <span class="cmt">; Crossing timer is now active</span>
+<span class="line-num">356</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">358</span>    <span class="kw">BL</span>      <span class="lbl">RESET_CROSS_TIMER_ONLY</span> <span class="cmt">; Zero accumulator & flags</span>
+<span class="line-num">361</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">GPIOB_ODR</span>
+<span class="line-num">362</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">363</span>    <span class="kw">BIC</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PB3_RED</span>    <span class="cmt">; RED OFF</span>
+<span class="line-num">364</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PB5_YELLOW</span> <span class="cmt">; YELLOW ON</span>
+<span class="line-num">365</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">367</span>    <span class="kw">MOV</span>     <span class="reg">R4</span>, #<span class="num">1</span>              <span class="cmt">; Wait 1 second</span>
+<span class="line-num">369</span><span class="lbl">YELLOW_WAIT</span>
+<span class="line-num">370</span>    <span class="kw">BL</span>      <span class="lbl">DISPLAY_STOP_ONCE</span>  <span class="cmt">; Keep showing "STOP" during warning</span>
+<span class="line-num">371</span>    <span class="kw">BL</span>      <span class="lbl">UPDATE_TIMERS</span>      <span class="cmt">; Tick timers</span>
+<span class="line-num">373</span>    <span class="kw">BL</span>      <span class="lbl">CONSUME_SECOND_FLAG</span>
+<span class="line-num">374</span>    <span class="kw">CMP</span>     <span class="reg">R0</span>, #<span class="num">0</span>              <span class="cmt">; Was a second consumed?</span>
+<span class="line-num">375</span>    <span class="kw">BEQ</span>     <span class="lbl">YELLOW_WAIT</span>        <span class="cmt">; No → keep waiting</span>
+<span class="line-num">377</span>    <span class="kw">SUBS</span>    <span class="reg">R4</span>, <span class="reg">R4</span>, #<span class="num">1</span>          <span class="cmt">; Decrement seconds remaining</span>
+<span class="line-num">378</span>    <span class="kw">BNE</span>     <span class="lbl">YELLOW_WAIT</span>        <span class="cmt">; If not zero, continue waiting</span></code></pre>
+        <div class="callout">
+          <strong>Fix Note (from comments):</strong> Setting <code>CROSS_ACTIVE = 1</code> during the yellow phase is the critical fix. Previously, the crossing timer wasn't counting during yellow, causing <code>CONSUME_SECOND_FLAG</code> to never return 1, making yellow wait forever. Now <code>UPDATE_TIMERS</code> will accumulate milliseconds and produce second flags.
+        </div>
+      </div>
+    </details>
+
+    <!-- ===== 3.9 Crossing Main Loop ===== -->
+    <details>
+      <summary>Lines 383–487 — CROSSING_START: Main Countdown Loop</summary>
+      <div class="detail-body">
+<pre><code><span class="line-num">383</span><span class="lbl">CROSSING_START</span>
+<span class="line-num">385</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">GPIOB_ODR</span>
+<span class="line-num">387</span>    <span class="kw">BIC</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PB3_RED</span>    <span class="cmt">; RED OFF</span>
+<span class="line-num">388</span>    <span class="kw">BIC</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PB5_YELLOW</span> <span class="cmt">; YELLOW OFF</span>
+<span class="line-num">398</span>    <span class="kw">MOV</span>     <span class="reg">R4</span>, #<span class="num">CROSS_TIME</span>     <span class="cmt">; R4 = 60 (countdown)</span>
+<span class="line-num">400</span><span class="lbl">COUNTDOWN_LOOP</span>
+<span class="line-num">401</span>    <span class="kw">CMP</span>     <span class="reg">R4</span>, #<span class="num">0</span>
+<span class="line-num">402</span>    <span class="kw">BEQ</span>     <span class="lbl">END_CROSSING</span>       <span class="cmt">; Done counting down</span>
+<span class="line-num">404</span>    <span class="kw">MOV</span>     <span class="reg">R0</span>, <span class="reg">R4</span>              <span class="cmt">; R0 = seconds remaining</span>
+<span class="line-num">405</span>    <span class="kw">BL</span>      <span class="lbl">DISPLAY_COUNT_GO_ONCE</span> <span class="cmt">; Show number + "GO"</span>
+<span class="line-num">407</span>    <span class="kw">BL</span>      <span class="lbl">UPDATE_TIMERS</span></code></pre>
+
+        <h4>Buzzer Toggle (Lines 412–423)</h4>
+<pre><code><span class="line-num">412</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM2_CNT</span>
+<span class="line-num">413</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">414</span>    <span class="kw">TST</span>     <span class="reg">R1</span>, #<span class="num">0x200</span>         <span class="cmt">; Test bit 9 (toggles every 512 ms)</span>
+<span class="line-num">415</span>    <span class="kw">BEQ</span>     <span class="lbl">BUZZER_NORMAL_OFF</span>
+<span class="line-num">418</span>    <span class="kw">BL</span>      <span class="lbl">BUZZER_ON</span>
+<span class="line-num">422</span>    <span class="kw">BL</span>      <span class="lbl">BUZZER_OFF</span></code></pre>
+        <div class="callout">
+          <strong>Clever trick:</strong> Bit 9 of TIM2_CNT (which counts at 1 kHz) toggles every 512 ms. This creates a ~1 Hz beeping pattern without any additional timer or counter. When bit 9 is 1, buzzer ON; when 0, buzzer OFF.
+        </div>
+
+        <h4>Green Blink Control (Lines 430–466)</h4>
+<pre><code><span class="line-num">430</span>    <span class="kw">CMP</span>     <span class="reg">R4</span>, #<span class="num">BLINK_START</span>    <span class="cmt">; R4 ≤ 10 ?</span>
+<span class="line-num">431</span>    <span class="kw">BLE</span>     <span class="lbl">BLINK_GREEN_CONTROL</span>
+<span class="line-num">434</span>    <span class="kw">BL</span>      <span class="lbl">GREEN_PWM_CURRENT_MODE</span> <span class="cmt">; Steady green (> 10s left)</span>
+<span class="cmt">; Blink logic: 2s ON, 2s OFF pattern</span>
+<span class="line-num">439</span>    <span class="kw">CMP</span>     <span class="reg">R4</span>, #<span class="num">8</span>   <span class="cmt">; 10,9 → ON</span>
+<span class="line-num">443</span>    <span class="kw">CMP</span>     <span class="reg">R4</span>, #<span class="num">6</span>   <span class="cmt">; 8,7  → OFF</span>
+<span class="line-num">447</span>    <span class="kw">CMP</span>     <span class="reg">R4</span>, #<span class="num">4</span>   <span class="cmt">; 6,5  → ON</span>
+<span class="line-num">451</span>    <span class="kw">CMP</span>     <span class="reg">R4</span>, #<span class="num">2</span>   <span class="cmt">; 4,3  → OFF</span>
+<span class="line-num">455</span>    <span class="kw">CMP</span>     <span class="reg">R4</span>, #<span class="num">0</span>   <span class="cmt">; 2,1  → ON</span></code></pre>
+        <p>This implements a hard-coded 2-second blink pattern using a cascade of comparisons on the remaining seconds.</p>
+
+        <h4>Button Reset During Crossing (Lines 473–487)</h4>
+<pre><code><span class="line-num">473</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">GPIOA_IDR</span>
+<span class="line-num">474</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]
+<span class="line-num">475</span>    <span class="kw">TST</span>     <span class="reg">R1</span>, #<span class="num">PA6_BUTTON</span>
+<span class="line-num">476</span>    <span class="kw">BEQ</span>     <span class="lbl">NO_RESET</span>           <span class="cmt">; Button not pressed → skip</span>
+<span class="line-num">478</span>    <span class="kw">MOV</span>     <span class="reg">R4</span>, #<span class="num">CROSS_TIME</span>     <span class="cmt">; Reset countdown to 60!</span>
+<span class="line-num">479</span>    <span class="kw">BL</span>      <span class="lbl">RESET_CROSS_TIMER_ONLY</span>
+<span class="line-num">482</span>    <span class="kw">BL</span>      <span class="lbl">CONSUME_SECOND_FLAG</span>
+<span class="line-num">483</span>    <span class="kw">CMP</span>     <span class="reg">R0</span>, #<span class="num">0</span>
+<span class="line-num">484</span>    <span class="kw">BEQ</span>     <span class="lbl">COUNTDOWN_LOOP</span>     <span class="cmt">; No second elapsed → keep looping</span>
+<span class="line-num">486</span>    <span class="kw">SUBS</span>    <span class="reg">R4</span>, <span class="reg">R4</span>, #<span class="num">1</span>          <span class="cmt">; One second passed → decrement</span>
+<span class="line-num">487</span>    <span class="kw">B</span>       <span class="lbl">COUNTDOWN_LOOP</span></code></pre>
+        <p>If the button is pressed mid-crossing, the countdown resets to 60 seconds. This lets pedestrians extend crossing time.</p>
+      </div>
+    </details>
+
+    <!-- ===== 3.10 END_CROSSING ===== -->
+    <details>
+      <summary>Lines 492–534 — END_CROSSING Phase</summary>
+      <div class="detail-body">
+<pre><code><span class="line-num">492</span><span class="lbl">END_CROSSING</span>
+<span class="line-num">493</span>    <span class="kw">BL</span>      <span class="lbl">BUZZER_OFF</span>
+<span class="line-num">494</span>    <span class="kw">BL</span>      <span class="lbl">GREEN_PWM_OFF</span>
+<span class="line-num">497</span>    <span class="kw">BL</span>      <span class="lbl">RESET_CROSS_TIMER_ONLY</span>
+<span class="line-num">498</span>    <span class="kw">MOV</span>     <span class="reg">R4</span>, #<span class="num">1</span>              <span class="cmt">; Show "00" for 1 second</span>
+<span class="line-num">500</span><span class="lbl">SHOW_00</span>
+<span class="line-num">501</span>    <span class="kw">MOV</span>     <span class="reg">R0</span>, #<span class="num">0</span>              <span class="cmt">; Display "00"</span>
+<span class="line-num">502</span>    <span class="kw">BL</span>      <span class="lbl">DISPLAY_COUNT_GO_ONCE</span>
+<span class="cmt">; ... wait for 1 second ...</span>
+<span class="line-num">512</span>    <span class="cmt">; Then YELLOW ON for 1 second</span>
+<span class="line-num">522</span><span class="lbl">END_YELLOW_WAIT</span>
+<span class="line-num">523</span>    <span class="kw">BL</span>      <span class="lbl">DISPLAY_STOP_ONCE</span>
+<span class="line-num">524</span>    <span class="kw">BL</span>      <span class="lbl">UPDATE_TIMERS</span>
+<span class="cmt">; ... wait 1 second ...</span>
+<span class="line-num">533</span>    <span class="kw">B</span>       <span class="lbl">IDLE</span>               <span class="cmt">; Return to idle state</span></code></pre>
+        <p>The sequence: display "00 GO" for 1 second → YELLOW on + "STOP" for 1 second → back to IDLE.</p>
+      </div>
+    </details>
+
+    <!-- ===== 3.11 UPDATE_TIMERS ===== -->
+    <details>
+      <summary>Lines 539–606 — UPDATE_TIMERS Function</summary>
+      <div class="detail-body">
+        <p>This is the core timing engine. Called frequently from every busy-wait loop.</p>
+<pre><code><span class="line-num">539</span><span class="lbl">UPDATE_TIMERS</span>
+<span class="line-num">540</span>    <span class="kw">PUSH</span>    {<span class="reg">R0-R7</span>, <span class="reg">LR</span>}        <span class="cmt">; Save 9 registers to stack</span>
+<span class="line-num">542</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="num">TIM2_CNT</span>
+<span class="line-num">543</span>    <span class="kw">LDR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]             <span class="cmt">; R1 = current TIM2 count</span>
+<span class="line-num">545</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">LAST_TIM2_COUNT</span>
+<span class="line-num">546</span>    <span class="kw">LDR</span>     <span class="reg">R2</span>, [<span class="reg">R0</span>]             <span class="cmt">; R2 = previous TIM2 count</span>
+<span class="line-num">547</span>    <span class="kw">STR</span>     <span class="reg">R1</span>, [<span class="reg">R0</span>]             <span class="cmt">; Update stored count</span>
+<span class="line-num">549</span>    <span class="kw">SUBS</span>    <span class="reg">R3</span>, <span class="reg">R1</span>, <span class="reg">R2</span>           <span class="cmt">; R3 = delta (ms elapsed since last call)</span></code></pre>
+        <p>The delta calculation <code>R3 = current - previous</code> gives milliseconds elapsed. Since TIM2 is 32-bit, unsigned subtraction handles wraparound correctly.</p>
+
+        <h4>Day/Night Timer (Lines 554–573)</h4>
+<pre><code><span class="line-num">554</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">DAYNIGHT_ACC</span>
+<span class="line-num">555</span>    <span class="kw">LDR</span>     <span class="reg">R4</span>, [<span class="reg">R0</span>]             <span class="cmt">; R4 = accumulated ms</span>
+<span class="line-num">556</span>    <span class="kw">ADDS</span>    <span class="reg">R4</span>, <span class="reg">R4</span>, <span class="reg">R3</span>           <span class="cmt">; Add delta</span>
+<span class="line-num">558</span><span class="lbl">DAYNIGHT_CHECK_LOOP</span>
+<span class="line-num">559</span>    <span class="kw">LDR</span>     <span class="reg">R5</span>, =<span class="num">DAYNIGHT_PERIOD_MS</span> <span class="cmt">; 10000</span>
+<span class="line-num">560</span>    <span class="kw">CMP</span>     <span class="reg">R4</span>, <span class="reg">R5</span>
+<span class="line-num">561</span>    <span class="kw">BLO</span>     <span class="lbl">DAYNIGHT_STORE</span>     <span class="cmt">; If acc &lt; 10000, done</span>
+<span class="line-num">563</span>    <span class="kw">SUBS</span>    <span class="reg">R4</span>, <span class="reg">R4</span>, <span class="reg">R5</span>           <span class="cmt">; acc -= 10000</span>
+<span class="line-num">565</span>    <span class="kw">LDR</span>     <span class="reg">R6</span>, =<span class="lbl">MODE_FLAG</span>
+<span class="line-num">566</span>    <span class="kw">LDR</span>     <span class="reg">R7</span>, [<span class="reg">R6</span>]
+<span class="line-num">567</span>    <span class="kw">EOR</span>     <span class="reg">R7</span>, <span class="reg">R7</span>, #<span class="num">1</span>           <span class="cmt">; Toggle: 0↔1 (DAY↔NIGHT)</span>
+<span class="line-num">568</span>    <span class="kw">STR</span>     <span class="reg">R7</span>, [<span class="reg">R6</span>]
+<span class="line-num">570</span>    <span class="kw">B</span>       <span class="lbl">DAYNIGHT_CHECK_LOOP</span> <span class="cmt">; Check again (handles lag)</span></code></pre>
+        <div class="callout success">
+          <strong>EOR toggle trick:</strong> <code>EOR R7, R7, #1</code> (exclusive OR with 1) flips bit 0. If MODE_FLAG was 0 (DAY), it becomes 1 (NIGHT) and vice versa. This is a classic single-bit toggle.
+        </div>
+        <p>The loop handles edge cases where the delta spans multiple periods (e.g., if <code>UPDATE_TIMERS</code> wasn't called for 20 seconds, it toggles twice).</p>
+
+        <h4>Crossing Second Timer (Lines 578–605)</h4>
+<pre><code><span class="line-num">578</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">CROSS_ACTIVE</span>
+<span class="line-num">579</span>    <span class="kw">LDR</span>     <span class="reg">R4</span>, [<span class="reg">R0</span>]
+<span class="line-num">580</span>    <span class="kw">CMP</span>     <span class="reg">R4</span>, #<span class="num">0</span>
+<span class="line-num">581</span>    <span class="kw">BEQ</span>     <span class="lbl">UPDATE_TIMERS_DONE</span> <span class="cmt">; Skip if crossing not active</span>
+<span class="line-num">583</span>    <span class="kw">LDR</span>     <span class="reg">R0</span>, =<span class="lbl">CROSS_ACC</span>
+<span class="line-num">584</span>    <span class="kw">LDR</span>     <span class="reg">R4</span>, [<span class="reg">R0</span>]
+<span class="line-num">585</span>    <span class="kw">ADDS</span>    <span class="reg">R4</span>, <span class="reg">R4</span>, <span class="reg">R3</span>           <span class="cmt">; acc += delta_ms</span>
+<span class="line-num">587</span><span class="lbl">CROSS_SECOND_CHECK</span>
+<span class="line-num">588</span>    <span class="kw">LDR</span>     <span class="reg">R5</span>, =<span class="num">ONE_SECOND_MS</span>  <span class="cmt">; 1000</span>
+<span class="line-num">589</span>    <span class="kw">CMP</span>     <span class="reg">R4</span>, <span class="reg">R5</span>
+<span class="line-num">590</span>    <span class="kw">BLO</span>     <span class="lbl">CROSS_ACC_STORE</span>
+<span class="line-num">592</span>    <span class="kw">SUBS</span>    <span class="reg">R4</span>, <span class="reg">R4</span>, <span class="reg">R5</span>           <span class="cmt">; acc -= 1000</span>
+<span class="line-num">594</span>    <span class="kw">LDR</span>     <span class="reg">R6</span>, =<span class="lbl">SECOND_FLAG</span>
+<span class="line-num">595</span>    <span class="kw">LDR</span>     <span class="reg">R7</span>, [<span class="reg">R6</span>]
+<span class="line-num">596</span>    <span class="kw">ADDS</span>    <span class="reg">R7</span>, <span class="reg">R7</span>, #<span class="num">1</span>           <span class="cmt">; Increment second counter</span>
+<span class="line-num">597</span>    <span class="kw">STR</span>     <span class="reg">R7</span>, [<span class="reg">R6</span>]
+<span class="line-num">599</span>    <span class="kw">B</span>       <span class="lbl">CROSS_SECOND_CHECK</span> <span class="cmt">; May have multiple seconds</span>
+<span class="line-num">605</span>    <span class="kw">POP</span>     {<span class="reg">R0-R7</span>, <span class="reg">PC</span>}        <span class="cmt">; Return (PC ← LR from stack)</span></code></pre>
+        <p>When <code>CROSS_ACTIVE</code> is 1, the function accumulates milliseconds in <code>CROSS_ACC</code>. Each time 1000 ms is reached, it increments <code>SECOND_FLAG</code> (a semaphore-like counter that the main loop consumes one-at-a-time).</p>
+      </div>
+    </details>
+
+    <!-- ===== 3.12 Display Functions ===== -->
+    <details>
+      <summary>Lines 681–869 — Display Multiplexing Functions</summary>
+      <div class="detail-body">
+        <h4>DISPLAY_STOP_ONCE (Lines 681–697)</h4>
+<pre><code><span class="line-num">684</span>    <span class="kw">MOV</span>     <span class="reg">R0</span>, #<span class="num">0x6D</span>   <span class="cmt">; Segment pattern for 'S' = 0b1101101</span>
+<span class="line-num">685</span>    <span class="kw">BL</span>      <span class="lbl">SHOW_WORD_DIG1</span>
+<span class="line-num">687</span>    <span class="kw">MOV</span>     <span class="reg">R0</span>, #<span class="num">0x78</span>   <span class="cmt">; 't' = 0b1111000</span>
+<span class="line-num">688</span>    <span class="kw">BL</span>      <span class="lbl">SHOW_WORD_DIG2</span>
+<span class="line-num">690</span>    <span class="kw">MOV</span>     <span class="reg">R0</span>, #<span class="num">0x3F</span>   <span class="cmt">; 'O' = 0b0111111 (same as '0')</span>
+<span class="line-num">691</span>    <span class="kw">BL</span>      <span class="lbl">SHOW_WORD_DIG3</span>
+<span class="line-num">693</span>    <span class="kw">MOV</span>     <span class="reg">R0</span>, #<span class="num">0x73</span>   <span class="cmt">; 'P' = 0b1110011</span>
+<span class="line-num">694</span>    <span class="kw">BL</span>      <span class="lbl">SHOW_WORD_DIG4</span></code></pre>
+        <p>Each digit is activated for a brief <code>SHORT_DELAY</code> then turned off, creating the illusion of a persistent display through rapid multiplexing (persistence of vision). The segment encoding follows the standard 7-segment pattern:</p>
+        <table class="small-table">
+          <tr><th>Bit</th><th>6</th><th>5</th><th>4</th><th>3</th><th>2</th><th>1</th><th>0</th></tr>
+          <tr><th>Segment</th><td>G</td><td>F</td><td>E</td><td>D</td><td>C</td><td>B</td><td>A</td></tr>
+        </table>
+        <table class="small-table">
+          <tr><th>Character</th><th>Hex</th><th>Binary</th><th>Segments</th></tr>
+          <tr><td>S (=5)</td><td>0x6D</td><td>1101101</td><td>A,C,D,F,G</td></tr>
+          <tr><td>t</td><td>0x78</td><td>1111000</td><td>D,E,F,G</td></tr>
+          <tr><td>O (=0)</td><td>0x3F</td><td>0111111</td><td>A,B,C,D,E,F</td></tr>
+          <tr><td>P</td><td>0x73</td><td>1110011</td><td>A,B,E,F,G</td></tr>
+        </table>
+
+        <h4 style="margin-top:1rem">Common-Cathode vs Common-Anode</h4>
+        <p>The countdown display uses <strong>common-cathode</strong> (CC): cathode is shared at ground, segments turn ON by setting HIGH. The word display uses <strong>common-anode</strong> (CA): anode is shared at VCC, segments turn ON by setting LOW (inverted logic).</p>
+        <ul>
+          <li><code>SET_SEGMENTS_CC</code>: Uses <code>ORRNE</code> to set segment pins HIGH when the corresponding bit is 1.</li>
+          <li><code>SET_SEGMENTS_CA</code>: First sets all segments HIGH (OFF), then uses <code>BICNE</code> to clear pins LOW (ON) for active segments. This is the inverted logic for common-anode.</li>
+        </ul>
+      </div>
+    </details>
+
+    <!-- ===== 3.13 Segment Drivers ===== -->
+    <details>
+      <summary>Lines 874–994 — SET_SEGMENTS_CC / SET_SEGMENTS_CA</summary>
+      <div class="detail-body">
+        <h4>SET_SEGMENTS_PATTERN_CC (Common-Cathode)</h4>
+<pre><code><span class="line-num">887</span><span class="lbl">SET_SEGMENTS_PATTERN_CC</span>
+<span class="cmt">; R2 contains the 7-bit segment pattern</span>
+<span class="cmt">; PORT C: Segment A (bit 0), Segment B (bit 1)</span>
+<span class="line-num">893</span>    <span class="kw">BIC</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PC0_SEGA</span>  <span class="cmt">; Clear seg A</span>
+<span class="line-num">894</span>    <span class="kw">BIC</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PC1_SEGB</span>  <span class="cmt">; Clear seg B</span>
+<span class="line-num">896</span>    <span class="kw">TST</span>     <span class="reg">R2</span>, #(<span class="num">1</span> &lt;&lt; <span class="num">0</span>)      <span class="cmt">; Is bit 0 (seg A) set?</span>
+<span class="line-num">897</span>    <span class="kw">ORRNE</span>   <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PC0_SEGA</span>  <span class="cmt">; If NE (bit was set), turn ON</span>
+<span class="line-num">899</span>    <span class="kw">TST</span>     <span class="reg">R2</span>, #(<span class="num">1</span> &lt;&lt; <span class="num">1</span>)
+<span class="line-num">900</span>    <span class="kw">ORRNE</span>   <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PC1_SEGB</span></code></pre>
+        <p><code>ORRNE</code> is a <strong>conditionally executed</strong> instruction. It only executes if the previous <code>TST</code> set the Z flag to 0 (i.e., the tested bit was NOT zero). This avoids branching and is more efficient.</p>
+
+        <h4 style="margin-top:1rem">SET_SEGMENTS_CA (Common-Anode)</h4>
+<pre><code><span class="line-num">942</span><span class="lbl">SET_SEGMENTS_CA</span>
+<span class="line-num">945</span>    <span class="kw">MOV</span>     <span class="reg">R2</span>, <span class="reg">R0</span>              <span class="cmt">; R2 = segment pattern</span>
+<span class="cmt">; PORT C: Start with segments OFF (HIGH for CA)</span>
+<span class="line-num">950</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PC0_SEGA</span>  <span class="cmt">; seg A OFF (HIGH)</span>
+<span class="line-num">951</span>    <span class="kw">ORR</span>     <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PC1_SEGB</span>
+<span class="line-num">953</span>    <span class="kw">TST</span>     <span class="reg">R2</span>, #(<span class="num">1</span> &lt;&lt; <span class="num">0</span>)
+<span class="line-num">954</span>    <span class="kw">BICNE</span>   <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PC0_SEGA</span>  <span class="cmt">; If bit set → clear pin (LOW = ON for CA)</span></code></pre>
+        <p>Inverted logic: for common-anode, segments are active-low. <code>BICNE</code> clears the pin (drives low) to turn the segment ON.</p>
+      </div>
+    </details>
+
+    <!-- ===== 3.14 Utility Functions ===== -->
+    <details>
+      <summary>Lines 999–1139 — Utility Functions</summary>
+      <div class="detail-body">
+        <h4>ALL_DIGITS_OFF</h4>
+        <p>Disables all 6 digit select lines. For CC digits (countdown), setting the cathode pins HIGH disables them. For CA digits (word), setting the anode pins LOW disables them.</p>
+
+        <h4>GREEN_PWM_FULL / DIM / OFF</h4>
+<pre><code><span class="lbl">GREEN_PWM_FULL</span>    <span class="cmt">; TIM3_CCR1 = 999 → 100% duty → max brightness</span>
+<span class="lbl">GREEN_PWM_DIM</span>     <span class="cmt">; TIM3_CCR1 = 120 → 12% duty → dim night mode</span>
+<span class="lbl">GREEN_PWM_OFF</span>     <span class="cmt">; TIM3_CCR1 = 0   → 0% duty → LED off</span></code></pre>
+
+        <h4>SHORT_DELAY (Mux stabilization)</h4>
+<pre><code><span class="line-num">1117</span>    <span class="kw">LDR</span>     <span class="reg">R6</span>, =<span class="num">MUX_DELAY</span>      <span class="cmt">; R6 = 3000</span>
+<span class="line-num">1119</span><span class="lbl">SHORT_DELAY_LOOP</span>
+<span class="line-num">1120</span>    <span class="kw">SUBS</span>    <span class="reg">R6</span>, <span class="reg">R6</span>, #<span class="num">1</span>          <span class="cmt">; R6--</span>
+<span class="line-num">1121</span>    <span class="kw">BNE</span>     <span class="lbl">SHORT_DELAY_LOOP</span>   <span class="cmt">; Loop until R6 = 0</span></code></pre>
+        <p>At 16 MHz, each loop iteration takes ~3 cycles. So 3000 iterations ≈ 3000 × 3 / 16,000,000 ≈ <strong>0.56 ms</strong> — enough for display phosphor/LCD persistence.</p>
+
+        <h4>DELAY_SHORT (Button debounce)</h4>
+        <p>250,000 iterations ≈ 250,000 × 3 / 16,000,000 ≈ <strong>47 ms</strong> — a standard debounce period.</p>
+      </div>
+    </details>
+
+    <!-- ===== 3.15 Data Section ===== -->
+    <details>
+      <summary>Lines 1145–1169 — Data Sections</summary>
+      <div class="detail-body">
+        <h4>SEG_TABLE (Read-Only, Flash)</h4>
+<pre><code><span class="line-num">1147</span><span class="lbl">SEG_TABLE</span>
+<span class="line-num">1148</span>    <span class="dir">DCB</span>     <span class="num">0x3F</span>    <span class="cmt">; 0: ABCDEF  = 0111111</span>
+<span class="line-num">1149</span>    <span class="dir">DCB</span>     <span class="num">0x06</span>    <span class="cmt">; 1: BC      = 0000110</span>
+<span class="line-num">1150</span>    <span class="dir">DCB</span>     <span class="num">0x5B</span>    <span class="cmt">; 2: ABDEG   = 1011011</span>
+<span class="line-num">1151</span>    <span class="dir">DCB</span>     <span class="num">0x4F</span>    <span class="cmt">; 3: ABCDG   = 1001111</span>
+<span class="line-num">1152</span>    <span class="dir">DCB</span>     <span class="num">0x66</span>    <span class="cmt">; 4: BCFG    = 1100110</span>
+<span class="line-num">1153</span>    <span class="dir">DCB</span>     <span class="num">0x6D</span>    <span class="cmt">; 5: ACDFG   = 1101101</span>
+<span class="line-num">1154</span>    <span class="dir">DCB</span>     <span class="num">0x7D</span>    <span class="cmt">; 6: ACDEFG  = 1111101</span>
+<span class="line-num">1155</span>    <span class="dir">DCB</span>     <span class="num">0x07</span>    <span class="cmt">; 7: ABC     = 0000111</span>
+<span class="line-num">1156</span>    <span class="dir">DCB</span>     <span class="num">0x7F</span>    <span class="cmt">; 8: ABCDEFG = 1111111</span>
+<span class="line-num">1157</span>    <span class="dir">DCB</span>     <span class="num">0x6F</span>    <span class="cmt">; 9: ABCDFG  = 1101111</span></code></pre>
+
+        <h4>MYVARS (Read-Write, SRAM)</h4>
+        <table>
+          <tr><th>Variable</th><th>Size</th><th>Initial</th><th>Purpose</th></tr>
+          <tr><td>LAST_TIM2_COUNT</td><td>4 bytes</td><td>TIM2_CNT</td><td>Previous TIM2 counter for delta calculation</td></tr>
+          <tr><td>DAYNIGHT_ACC</td><td>4 bytes</td><td>0</td><td>Millisecond accumulator for day/night toggle</td></tr>
+          <tr><td>CROSS_ACC</td><td>4 bytes</td><td>0</td><td>Millisecond accumulator for crossing seconds</td></tr>
+          <tr><td>SECOND_FLAG</td><td>4 bytes</td><td>0</td><td>Number of complete seconds available to consume</td></tr>
+          <tr><td>CROSS_ACTIVE</td><td>4 bytes</td><td>0</td><td>Boolean: is crossing timer running?</td></tr>
+          <tr><td>MODE_FLAG</td><td>4 bytes</td><td>0</td><td>0=DAY, 1=NIGHT</td></tr>
+        </table>
+      </div>
+    </details>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 4: ARM CONCEPTS USED                               -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section" id="sec4">
+  <div class="section-header"><h2>4️⃣ ARM Concepts Used</h2></div>
+  <div class="section-body">
+
+    <details>
+      <summary>Stack Operations</summary>
+      <div class="detail-body">
+        <p>The program uses <code>PUSH</code> and <code>POP</code> for function prologue/epilogue. The stack grows downward from <code>0x20020000</code>.</p>
+<pre><code><span class="kw">PUSH</span>    {<span class="reg">R0</span>, <span class="reg">R1</span>, <span class="reg">LR</span>}   <span class="cmt">; Save caller-saved regs + return address</span>
+<span class="cmt">; ... function body ...</span>
+<span class="kw">POP</span>     {<span class="reg">R0</span>, <span class="reg">R1</span>, <span class="reg">PC</span>}   <span class="cmt">; Restore regs, LR value → PC = return</span></code></pre>
+        <p>The <strong>POP {…, PC}</strong> pattern is the standard Thumb-2 function return: the saved LR value is loaded directly into PC, causing a branch to the return address. This is equivalent to <code>POP {…, LR}</code> followed by <code>BX LR</code> but saves one instruction.</p>
+        <p>Maximum stack depth: <code>UPDATE_TIMERS</code> pushes 9 words (36 bytes), and it calls no deep sub-functions, so the deepest nesting is approximately IDLE → DISPLAY_STOP_ONCE → SHOW_WORD_DIG1 → ALL_DIGITS_OFF → SET_SEGMENTS_CA, consuming roughly 4–5 frames × ~3–9 words = ~80–180 bytes of stack. Extremely modest.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Link Register (LR) & Program Counter (PC)</summary>
+      <div class="detail-body">
+        <p><strong>LR (R14):</strong> When <code>BL label</code> is executed, the processor stores the return address (next instruction) in LR, then branches to <code>label</code>. Nested calls overwrite LR, which is why every function pushes LR on entry.</p>
+        <p><strong>PC (R15):</strong> The program counter. Writing to PC causes a branch. <code>POP {…, PC}</code> pops the saved LR into PC, effectively returning from a function.</p>
+        <div class="callout warn">
+          <strong>Thumb bit:</strong> On Cortex-M, bit 0 of any branch target must be set to 1 (indicating Thumb mode). The <code>BL</code> instruction and the linker handle this automatically. If you manually loaded an address without the Thumb bit, a Usage Fault would occur.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Calling Conventions (AAPCS)</summary>
+      <div class="detail-body">
+        <p>This code loosely follows the ARM Architecture Procedure Call Standard:</p>
+        <table>
+          <tr><th>Register</th><th>Role</th><th>Usage in this code</th></tr>
+          <tr><td>R0–R3</td><td>Arguments / return / scratch</td><td>R0 used for function arguments (segment pattern, second count). R0 used as return value from CONSUME_SECOND_FLAG.</td></tr>
+          <tr><td>R4–R11</td><td>Callee-saved</td><td>R4 used as countdown counter across function calls (saved/restored by callees). R7 used as temp in UPDATE_TIMERS.</td></tr>
+          <tr><td>R12</td><td>IP (scratch)</td><td>Not used</td></tr>
+          <tr><td>SP (R13)</td><td>Stack pointer</td><td>Managed by PUSH/POP</td></tr>
+          <tr><td>LR (R14)</td><td>Link register</td><td>Saved to stack in every function</td></tr>
+          <tr><td>PC (R15)</td><td>Program counter</td><td>Loaded from stack on return</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>Branch Instructions</summary>
+      <div class="detail-body">
+        <table>
+          <tr><th>Instruction</th><th>Meaning</th><th>Usage</th></tr>
+          <tr><td><code>B label</code></td><td>Unconditional branch</td><td>State transitions, loop back</td></tr>
+          <tr><td><code>BL label</code></td><td>Branch with Link (call)</td><td>Function calls (saves return address in LR)</td></tr>
+          <tr><td><code>BEQ label</code></td><td>Branch if Equal (Z=1)</td><td>After TST/CMP, branch if zero/equal</td></tr>
+          <tr><td><code>BNE label</code></td><td>Branch if Not Equal (Z=0)</td><td>After SUBS, loop while not zero</td></tr>
+          <tr><td><code>BLT label</code></td><td>Branch if Less Than (signed)</td><td>Comparison in CALC_TENS_LOOP</td></tr>
+          <tr><td><code>BLE label</code></td><td>Branch if Less or Equal</td><td>Blink threshold check</td></tr>
+          <tr><td><code>BGT label</code></td><td>Branch if Greater Than</td><td>Blink pattern comparisons</td></tr>
+          <tr><td><code>BLO label</code></td><td>Branch if Lower (unsigned)</td><td>Timer accumulator vs period</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>Conditional Execution</summary>
+      <div class="detail-body">
+        <p>ARM (and Thumb-2) supports conditional execution suffixes. In this code:</p>
+<pre><code><span class="kw">TST</span>     <span class="reg">R2</span>, #(<span class="num">1</span> &lt;&lt; <span class="num">0</span>)   <span class="cmt">; Sets Z flag: Z=1 if bit 0 is 0</span>
+<span class="kw">ORRNE</span>   <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">PC0_SEGA</span> <span class="cmt">; Execute ORR only if Z=0 (bit was set)</span></code></pre>
+        <p>This avoids a branch instruction, making the code smaller and faster. The <code>NE</code> suffix means "Not Equal" (Z flag = 0). Similarly, <code>BICNE</code> conditionally clears bits.</p>
+        <div class="callout">
+          <strong>IT blocks:</strong> In Thumb-2, conditional instructions outside IT blocks are limited. The assembler automatically generates IT (If-Then) blocks for these conditional instructions. For example, <code>ORRNE</code> is assembled as <code>IT NE</code> followed by <code>ORR</code>.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Addressing Modes</summary>
+      <div class="detail-body">
+        <table>
+          <tr><th>Mode</th><th>Example</th><th>Description</th></tr>
+          <tr><td>Immediate</td><td><code>MOV R1, #0</code></td><td>Value embedded in instruction</td></tr>
+          <tr><td>Register</td><td><code>MOV R0, R4</code></td><td>Value from another register</td></tr>
+          <tr><td>Register indirect</td><td><code>LDR R1, [R0]</code></td><td>Load from address in R0</td></tr>
+          <tr><td>Register + offset</td><td><code>LDRB R2, [R1, R0]</code></td><td>Load byte at R1+R0 (table lookup)</td></tr>
+          <tr><td>PC-relative literal</td><td><code>LDR R0, =GPIOA_MODER</code></td><td>Pseudo-instruction → PC-relative load from literal pool</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>Load/Store Architecture & Memory-Mapped I/O</summary>
+      <div class="detail-body">
+        <p>ARM is a <strong>load/store architecture</strong>: data must be loaded from memory into registers before operations, then stored back. You cannot directly operate on memory contents.</p>
+        <p>STM32 peripherals are <strong>memory-mapped</strong>: GPIO, timers, clocks all appear as addresses in the 0x40000000–0x5FFFFFFF range. Writing to <code>0x40020414</code> (GPIOB_ODR) directly changes the voltage on Port B output pins.</p>
+        <p>The standard pattern throughout the code:</p>
+<pre><code><span class="kw">LDR</span>  <span class="reg">R0</span>, =<span class="num">PERIPHERAL_REG</span>  <span class="cmt">; 1. Load register address</span>
+<span class="kw">LDR</span>  <span class="reg">R1</span>, [<span class="reg">R0</span>]              <span class="cmt">; 2. Read current value</span>
+<span class="kw">ORR</span>  <span class="reg">R1</span>, <span class="reg">R1</span>, #<span class="num">BIT_MASK</span>    <span class="cmt">; 3. Set bits (or BIC to clear)</span>
+<span class="kw">STR</span>  <span class="reg">R1</span>, [<span class="reg">R0</span>]              <span class="cmt">; 4. Write back</span></code></pre>
+      </div>
+    </details>
+
+    <details>
+      <summary>Memory Alignment</summary>
+      <div class="detail-body">
+        <p>The <code>ALIGN</code> directive at line 1168 ensures the next data is word-aligned (4-byte boundary). This is important because:</p>
+        <ul>
+          <li><code>LDR</code>/<code>STR</code> require word-aligned addresses for 32-bit accesses</li>
+          <li>The <code>DCD</code> variables in MYVARS are 4 bytes each and naturally align after the <code>DCB</code> table in MYDATA</li>
+          <li>Unaligned access on Cortex-M4 is supported but slower; the <code>ALIGN</code> is good practice</li>
+        </ul>
+      </div>
+    </details>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 5: REGISTER TRACKING                               -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section" id="sec5">
+  <div class="section-header"><h2>5️⃣ Register Tracking</h2></div>
+  <div class="section-body">
+
+    <h3>Key Register Roles by Context</h3>
+    <table>
+      <tr><th>Context</th><th>R0</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>R5</th><th>R6</th><th>R7</th></tr>
+      <tr><td>Init</td><td>Periph addr</td><td>Reg value</td><td>Bitmask</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>IDLE/WAIT</td><td>IDR addr</td><td>IDR value</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>COUNTDOWN</td><td>Arg/Return</td><td>—</td><td>—</td><td>—</td><td><strong>Seconds left</strong></td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>UPDATE_TIMERS</td><td>Addr</td><td>Current CNT</td><td>Prev CNT</td><td><strong>Delta ms</strong></td><td>Accumulator</td><td>Period</td><td>Flag addr</td><td>Flag value</td></tr>
+      <tr><td>DISPLAY_*</td><td>Seg pattern</td><td>ODR value</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>SET_SEGMENTS</td><td>Port addr</td><td>ODR value</td><td><strong>Pattern</strong></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>SHORT_DELAY</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><strong>Counter</strong></td><td>—</td></tr>
+    </table>
+
+    <h3 style="margin-top:1.5rem">R4 — The Countdown Register</h3>
+    <p>R4 is the most critical register in the main loop. It tracks <strong>seconds remaining</strong>:</p>
+    <table>
+      <tr><th>Event</th><th>R4 Value</th></tr>
+      <tr><td>CROSSING_START</td><td>60 (CROSS_TIME)</td></tr>
+      <tr><td>Each second tick consumed</td><td>59, 58, 57, …</td></tr>
+      <tr><td>Button pressed mid-crossing</td><td>Reset to 60</td></tr>
+      <tr><td>Reaches 0</td><td>Branch to END_CROSSING</td></tr>
+      <tr><td>SHOW_00 phase</td><td>1 (wait 1 second)</td></tr>
+      <tr><td>END_YELLOW_WAIT</td><td>1 (wait 1 second)</td></tr>
+    </table>
+
+    <h3 style="margin-top:1.5rem">SP (R13) — Stack Pointer</h3>
+    <p>Initial: <code>0x20020000</code>. Decremented by PUSH, incremented by POP. Deepest nesting example:</p>
+    <pre><code>IDLE → DISPLAY_STOP_ONCE [PUSH 2] → SHOW_WORD_DIG1 [PUSH 3]
+  → ALL_DIGITS_OFF [PUSH 3] → (returns)
+  → SET_SEGMENTS_CA [PUSH 4] → (returns)
+  → SHORT_DELAY [PUSH 2]
+Max depth ≈ 2+3+4+2 = 11 words = 44 bytes below 0x20020000</code></pre>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 6: CONTROL FLOW ANALYSIS                           -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section" id="sec6">
+  <div class="section-header"><h2>6️⃣ Control Flow Analysis</h2></div>
+  <div class="section-body">
+
+    <h3>Main State Machine</h3>
+    <div class="flow-diagram">
+      <div class="flow-box start">Reset_Handler<br><small>Init clocks, GPIO, timers, vars</small></div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box process">IDLE<br><small>RED on, buzzer/green off</small></div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box" style="border-color:var(--cyan)">WAIT_BUTTON<br><small>Display "STOP", poll PA6</small></div>
+      <div class="flow-arrow"></div>
+      <div class="flow-row">
+        <div class="flow-label">Button pressed?</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box" style="border-color:var(--yellow)">START_WARNING<br><small>YELLOW 1s, display "STOP"</small></div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box process">CROSSING_START<br><small>GREEN on (PWM), countdown 60→0</small></div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box" style="border-color:var(--orange)">COUNTDOWN_LOOP<br><small>Display count+"GO", buzzer, blink</small></div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box end">END_CROSSING<br><small>Show "00" 1s → YELLOW 1s → IDLE</small></div>
+    </div>
+
+    <h3>COUNTDOWN_LOOP Detail</h3>
+    <div class="flow-diagram">
+      <div class="flow-box start">COUNTDOWN_LOOP (R4 = seconds)</div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box">R4 == 0?<br><small>Yes → END_CROSSING</small></div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box">Display R4 + "GO"</div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box">UPDATE_TIMERS</div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box">Buzzer toggle (TIM2 bit 9)</div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box">Green: steady or blink (R4 ≤ 10)</div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box">Button pressed?<br><small>Yes → R4=60, reset timer</small></div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box">CONSUME_SECOND_FLAG</div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box">Second consumed?<br><small>Yes → R4-- </small></div>
+      <div class="flow-arrow"></div>
+      <div class="flow-box end">→ COUNTDOWN_LOOP</div>
+    </div>
+
+    <h3 style="margin-top:1.5rem">Loops</h3>
+    <table>
+      <tr><th>Loop</th><th>Type</th><th>Exit Condition</th></tr>
+      <tr><td>WAIT_BUTTON</td><td>Polling loop</td><td>Button pressed (PA6=1)</td></tr>
+      <tr><td>YELLOW_WAIT</td><td>Timed wait</td><td>R4 seconds consumed (1 second)</td></tr>
+      <tr><td>COUNTDOWN_LOOP</td><td>Countdown</td><td>R4 reaches 0</td></tr>
+      <tr><td>SHOW_00</td><td>Timed wait</td><td>1 second consumed</td></tr>
+      <tr><td>END_YELLOW_WAIT</td><td>Timed wait</td><td>1 second consumed</td></tr>
+      <tr><td>DAYNIGHT_CHECK_LOOP</td><td>Accumulator drain</td><td>Accumulator &lt; period</td></tr>
+      <tr><td>CROSS_SECOND_CHECK</td><td>Accumulator drain</td><td>Accumulator &lt; 1000</td></tr>
+      <tr><td>CALC_TENS_LOOP</td><td>Division by 10</td><td>Remainder &lt; 10</td></tr>
+      <tr><td>SHORT_DELAY_LOOP</td><td>Busy wait</td><td>Counter reaches 0</td></tr>
+      <tr><td>DELAY_SHORT_LOOP</td><td>Busy wait</td><td>Counter reaches 0</td></tr>
+    </table>
+
+    <h3 style="margin-top:1.5rem">Function Call Graph</h3>
+<pre><code><span class="cmt">Reset_Handler</span>
+  └─→ <span class="lbl">IDLE</span>
+       ├─→ BUZZER_OFF, GREEN_PWM_OFF, DISPLAY_ALL_OFF
+       └─→ <span class="lbl">WAIT_BUTTON</span> (loop)
+            ├─→ DISPLAY_STOP_ONCE
+            │    ├─→ SHOW_WORD_DIG1 → ALL_DIGITS_OFF, SET_SEGMENTS_CA, SHORT_DELAY
+            │    ├─→ SHOW_WORD_DIG2 → (same)
+            │    ├─→ SHOW_WORD_DIG3 → (same)
+            │    └─→ SHOW_WORD_DIG4 → (same)
+            ├─→ UPDATE_TIMERS
+            └─→ GREEN_PWM_OFF
+       └─→ <span class="lbl">START_WARNING</span>
+            ├─→ RESET_CROSS_TIMER_ONLY
+            └─→ <span class="lbl">YELLOW_WAIT</span> (loop)
+       └─→ <span class="lbl">CROSSING_START</span>
+            └─→ <span class="lbl">COUNTDOWN_LOOP</span>
+                 ├─→ DISPLAY_COUNT_GO_ONCE
+                 │    ├─→ SHOW_COUNT_DIG1 → ALL_DIGITS_OFF, SET_SEGMENTS_CC, SHORT_DELAY
+                 │    ├─→ SHOW_COUNT_DIG2 → (same)
+                 │    └─→ DISPLAY_GO_ONCE → SHOW_WORD_DIG1..4
+                 ├─→ UPDATE_TIMERS
+                 ├─→ BUZZER_ON / BUZZER_OFF
+                 ├─→ GREEN_PWM_CURRENT_MODE → GREEN_PWM_FULL / GREEN_PWM_DIM
+                 ├─→ GREEN_PWM_OFF
+                 ├─→ RESET_CROSS_TIMER_ONLY
+                 └─→ CONSUME_SECOND_FLAG
+       └─→ <span class="lbl">END_CROSSING</span> → SHOW_00 → END_YELLOW_WAIT → <span class="lbl">IDLE</span></code></pre>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 7: DATA FLOW ANALYSIS                              -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section" id="sec7">
+  <div class="section-header"><h2>7️⃣ Data Flow Analysis</h2></div>
+  <div class="section-body">
+
+    <h3>Variables (RAM)</h3>
+    <table>
+      <tr><th>Variable</th><th>Written by</th><th>Read by</th><th>Data Flow</th></tr>
+      <tr><td><code>LAST_TIM2_COUNT</code></td><td>Init, UPDATE_TIMERS, RESET_CROSS_TIMER_ONLY</td><td>UPDATE_TIMERS</td><td>Stores previous TIM2 snapshot for delta calculation</td></tr>
+      <tr><td><code>DAYNIGHT_ACC</code></td><td>Init, UPDATE_TIMERS</td><td>UPDATE_TIMERS</td><td>Accumulates ms; resets to remainder when ≥ 10000</td></tr>
+      <tr><td><code>CROSS_ACC</code></td><td>Init, UPDATE_TIMERS, RESET</td><td>UPDATE_TIMERS</td><td>Accumulates ms; resets when ≥ 1000</td></tr>
+      <tr><td><code>SECOND_FLAG</code></td><td>Init, UPDATE_TIMERS, RESET, CONSUME</td><td>CONSUME_SECOND_FLAG</td><td>Counting semaphore: incremented by timer, decremented by consumer</td></tr>
+      <tr><td><code>CROSS_ACTIVE</code></td><td>IDLE, START_WARNING, CROSSING_START</td><td>UPDATE_TIMERS</td><td>Gate: prevents crossing timer from running during IDLE</td></tr>
+      <tr><td><code>MODE_FLAG</code></td><td>Init, UPDATE_TIMERS</td><td>GREEN_PWM_CURRENT_MODE</td><td>0/1 toggle controls PWM duty cycle</td></tr>
+    </table>
+
+    <h3 style="margin-top:1.5rem">Constants (Flash)</h3>
+    <table>
+      <tr><th>Name</th><th>Type</th><th>Usage</th></tr>
+      <tr><td><code>SEG_TABLE</code></td><td>10-byte LUT</td><td>Indexed by digit (0–9) to get 7-segment pattern</td></tr>
+      <tr><td>Character patterns (0x6D, 0x78, etc.)</td><td>Immediates</td><td>Direct segment patterns for S, t, O, P, G characters</td></tr>
+    </table>
+
+    <h3 style="margin-top:1.5rem">Data Flow: Timer Delta → Countdown</h3>
+<pre><code>TIM2_CNT (hardware) ──→ LAST_TIM2_COUNT (snapshot)
+                    │
+                    └──→ delta = current - previous (ms elapsed)
+                              │
+                    ┌─────────┴──────────┐
+                    ▼                    ▼
+              DAYNIGHT_ACC          CROSS_ACC
+              += delta              += delta
+                    │                    │
+              ≥ 10000?              ≥ 1000?
+              toggle MODE_FLAG      SECOND_FLAG++
+                    │                    │
+                    ▼                    ▼
+              GREEN_PWM_CURRENT_MODE    CONSUME_SECOND_FLAG
+              (full vs dim)             (R4--)
+</code></pre>
+
+    <h3 style="margin-top:1.5rem">Pointer Usage</h3>
+    <p>The code uses pointers (register-indirect addressing) extensively:</p>
+    <ul>
+      <li><code>LDR R0, =VARIABLE</code> — loads the <strong>address</strong> of the variable into R0 (pointer)</li>
+      <li><code>LDR R1, [R0]</code> — dereferences the pointer to read the value</li>
+      <li><code>STR R1, [R0]</code> — writes through the pointer</li>
+      <li><code>LDRB R2, [R1, R0]</code> — pointer arithmetic for table lookup: <code>SEG_TABLE + digit_index</code></li>
+    </ul>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 8: EXECUTION WALKTHROUGH                           -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section" id="sec8">
+  <div class="section-header"><h2>8️⃣ Execution Walkthrough</h2></div>
+  <div class="section-body">
+
+    <p>Simulated execution from power-on with example register values:</p>
+
+    <details>
+      <summary>Phase 1: Power-On Reset & Initialization</summary>
+      <div class="detail-body">
+        <table>
+          <tr><th>Step</th><th>Instruction</th><th>Key Registers After</th><th>Effect</th></tr>
+          <tr><td>1</td><td>Hardware reset</td><td>SP=0x20020000, PC=Reset_Handler</td><td>Processor loads vector table</td></tr>
+          <tr><td>2</td><td>LDR R0, =RCC_AHB1ENR</td><td>R0=0x40023830</td><td>Point to clock enable reg</td></tr>
+          <tr><td>3</td><td>LDR R1, [R0]</td><td>R1=0x00000000 (default)</td><td>Read current clock config</td></tr>
+          <tr><td>4</td><td>ORR ×3, STR</td><td>*0x40023830 = 0x00000007</td><td>Enable GPIOA/B/C clocks</td></tr>
+          <tr><td>5</td><td>TIM2 config</td><td>PSC=15999, ARR=0xFFFF_FFFF, CNT=0</td><td>1 ms tick timer running</td></tr>
+          <tr><td>6</td><td>TIM3 PWM config</td><td>PSC=15, ARR=999, CCR1=0, CCMR1=0x68</td><td>1 kHz PWM, 0% duty</td></tr>
+          <tr><td>7</td><td>Variable init</td><td>All vars = 0, LAST_TIM2_COUNT = ~0</td><td>Ready for operation</td></tr>
+          <tr><td>8</td><td>B IDLE</td><td>PC → IDLE</td><td>Enter main state machine</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>Phase 2: IDLE State (waiting for button)</summary>
+      <div class="detail-body">
+        <table>
+          <tr><th>Step</th><th>Action</th><th>Observable Effect</th></tr>
+          <tr><td>1</td><td>BUZZER_OFF</td><td>PA9 LOW → silence</td></tr>
+          <tr><td>2</td><td>GREEN_PWM_OFF</td><td>TIM3_CCR1=0 → green LED dark</td></tr>
+          <tr><td>3</td><td>DISPLAY_ALL_OFF</td><td>All segments and digits off</td></tr>
+          <tr><td>4</td><td>CROSS_ACTIVE=0</td><td>Crossing timer won't count</td></tr>
+          <tr><td>5</td><td>PB3=1, PB5=0</td><td>RED LED ON, YELLOW LED OFF</td></tr>
+          <tr><td>6</td><td>WAIT_BUTTON loop</td><td>Rapidly multiplexes "S-t-O-P" on word display (~2ms per cycle)</td></tr>
+          <tr><td>7</td><td>UPDATE_TIMERS each loop</td><td>DAYNIGHT_ACC grows; MODE_FLAG toggles every 10s</td></tr>
+          <tr><td>8</td><td>GREEN_PWM_OFF each loop</td><td>Green stays off (overrides mode changes)</td></tr>
+          <tr><td>9</td><td>TST PA6 → BEQ</td><td>Keeps looping until button pressed</td></tr>
+        </table>
+        <div class="callout">
+          <strong>Example timing:</strong> At t=0, MODE_FLAG=0 (DAY). At t=10s, MODE_FLAG=1 (NIGHT). At t=20s, MODE_FLAG=0 again. But since green is forced OFF during idle, this has no visible effect until crossing starts.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Phase 3: Button Pressed → Warning → Crossing</summary>
+      <div class="detail-body">
+        <table>
+          <tr><th>Time</th><th>State</th><th>R4</th><th>LEDs</th><th>Display</th><th>Buzzer</th></tr>
+          <tr><td>t=0</td><td>Button detected</td><td>—</td><td>RED on</td><td>"STOP"</td><td>Off</td></tr>
+          <tr><td>t≈47ms</td><td>After debounce</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+          <tr><td>t≈47ms</td><td>START_WARNING</td><td>1</td><td>YELLOW on</td><td>"STOP"</td><td>Off</td></tr>
+          <tr><td>t≈1047ms</td><td>CROSSING_START</td><td>60</td><td>GREEN on (PWM)</td><td>"60 GO"</td><td>Beeping</td></tr>
+          <tr><td>t≈2047ms</td><td>COUNTDOWN</td><td>59</td><td>GREEN on</td><td>"59 GO"</td><td>Beeping</td></tr>
+          <tr><td>…</td><td>…</td><td>…</td><td>…</td><td>…</td><td>…</td></tr>
+          <tr><td>t≈51047ms</td><td>Blink start</td><td>10</td><td>GREEN blink ON</td><td>"10 GO"</td><td>Beeping</td></tr>
+          <tr><td>t≈53047ms</td><td>Blink</td><td>8</td><td>GREEN blink OFF</td><td>"08 GO"</td><td>Beeping</td></tr>
+          <tr><td>t≈55047ms</td><td>Blink</td><td>6</td><td>GREEN blink ON</td><td>"06 GO"</td><td>Beeping</td></tr>
+          <tr><td>t≈57047ms</td><td>Blink</td><td>4</td><td>GREEN blink OFF</td><td>"04 GO"</td><td>Beeping</td></tr>
+          <tr><td>t≈59047ms</td><td>Blink</td><td>2</td><td>GREEN blink ON</td><td>"02 GO"</td><td>Beeping</td></tr>
+          <tr><td>t≈61047ms</td><td>END_CROSSING</td><td>0→1</td><td>GREEN off</td><td>"00 GO"</td><td>Off</td></tr>
+          <tr><td>t≈62047ms</td><td>END_YELLOW</td><td>1</td><td>YELLOW on</td><td>"STOP"</td><td>Off</td></tr>
+          <tr><td>t≈63047ms</td><td>→ IDLE</td><td>—</td><td>RED on</td><td>"STOP"</td><td>Off</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>Phase 4: Day/Night Mode Effect</summary>
+      <div class="detail-body">
+        <p>Assume button pressed at t=15 seconds (MODE_FLAG=1, NIGHT mode):</p>
+        <table>
+          <tr><th>Event</th><th>MODE_FLAG</th><th>TIM3_CCR1</th><th>Green Brightness</th></tr>
+          <tr><td>Crossing starts at t=16s</td><td>1</td><td>120</td><td>12% (dim)</td></tr>
+          <tr><td>Mode toggle at t=20s</td><td>0</td><td>999</td><td>100% (full)</td></tr>
+          <tr><td>Mode toggle at t=30s</td><td>1</td><td>120</td><td>12% (dim)</td></tr>
+        </table>
+        <p>The green LED brightness changes <em>during</em> the crossing as the day/night timer is independent and continues toggling.</p>
+      </div>
+    </details>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 9: DECOMPILED PSEUDOCODE                           -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section" id="sec9">
+  <div class="section-header"><h2>9️⃣ Decompiled High-Level Pseudocode</h2></div>
+  <div class="section-body">
+
+<div class="pseudo"><span class="comment">// =========================================================</span>
+<span class="comment">// Zebra Crossing Light Controller — STM32F446RE</span>
+<span class="comment">// Clean C‑like Pseudocode</span>
+<span class="comment">// =========================================================</span>
+
+<span class="comment">// Global variables (SRAM)</span>
+<span class="type">volatile uint32_t</span> last_tim2_count = <span class="val">0</span>;
+<span class="type">volatile uint32_t</span> daynight_acc = <span class="val">0</span>;
+<span class="type">volatile uint32_t</span> cross_acc = <span class="val">0</span>;
+<span class="type">volatile uint32_t</span> second_flag = <span class="val">0</span>;
+<span class="type">volatile uint32_t</span> cross_active = <span class="val">0</span>;
+<span class="type">volatile uint32_t</span> mode_flag = <span class="val">0</span>;  <span class="comment">// 0=DAY, 1=NIGHT</span>
+
+<span class="type">const uint8_t</span> seg_table[<span class="val">10</span>] = {
+    <span class="val">0x3F</span>, <span class="val">0x06</span>, <span class="val">0x5B</span>, <span class="val">0x4F</span>, <span class="val">0x66</span>,
+    <span class="val">0x6D</span>, <span class="val">0x7D</span>, <span class="val">0x07</span>, <span class="val">0x7F</span>, <span class="val">0x6F</span>
+};
+
+<span class="keyword">void</span> <span class="func">update_timers</span>() {
+    <span class="type">uint32_t</span> current = TIM2->CNT;
+    <span class="type">uint32_t</span> delta = current - last_tim2_count;
+    last_tim2_count = current;
+
+    <span class="comment">// Day/Night toggle (independent, always runs)</span>
+    daynight_acc += delta;
+    <span class="keyword">while</span> (daynight_acc >= <span class="val">10000</span>) {
+        daynight_acc -= <span class="val">10000</span>;
+        mode_flag ^= <span class="val">1</span>;  <span class="comment">// toggle DAY↔NIGHT</span>
+    }
+
+    <span class="comment">// Crossing second counter</span>
+    <span class="keyword">if</span> (cross_active) {
+        cross_acc += delta;
+        <span class="keyword">while</span> (cross_acc >= <span class="val">1000</span>) {
+            cross_acc -= <span class="val">1000</span>;
+            second_flag++;
+        }
+    }
+}
+
+<span class="type">bool</span> <span class="func">consume_second</span>() {
+    <span class="keyword">if</span> (second_flag > <span class="val">0</span>) {
+        second_flag--;
+        <span class="keyword">return</span> <span class="val">true</span>;
+    }
+    <span class="keyword">return</span> <span class="val">false</span>;
+}
+
+<span class="keyword">void</span> <span class="func">reset_cross_timer</span>() {
+    cross_acc = <span class="val">0</span>;
+    second_flag = <span class="val">0</span>;
+    last_tim2_count = TIM2->CNT;
+}
+
+<span class="keyword">void</span> <span class="func">set_green_pwm</span>() {
+    <span class="keyword">if</span> (mode_flag == <span class="val">0</span>)
+        TIM3->CCR1 = <span class="val">999</span>;   <span class="comment">// DAY: full brightness</span>
+    <span class="keyword">else</span>
+        TIM3->CCR1 = <span class="val">120</span>;   <span class="comment">// NIGHT: dim</span>
+}
+
+<span class="keyword">void</span> <span class="func">wait_seconds</span>(<span class="type">int</span> n, <span class="keyword">void</span>(*<span class="func">display_fn</span>)()) {
+    <span class="keyword">while</span> (n > <span class="val">0</span>) {
+        display_fn();
+        update_timers();
+        <span class="keyword">if</span> (consume_second()) n--;
+    }
+}
+
+<span class="keyword">void</span> <span class="func">main</span>() {
+    <span class="comment">// Initialize clocks, GPIO, TIM2, TIM3, variables</span>
+    init_peripherals();
+
+    <span class="keyword">while</span> (<span class="val">1</span>) {  <span class="comment">// ====== IDLE STATE ======</span>
+        buzzer_off();
+        green_pwm_off();
+        cross_active = <span class="val">0</span>;
+        set_led(RED, ON);
+        set_led(YELLOW, OFF);
+
+        <span class="comment">// Wait for button press</span>
+        <span class="keyword">while</span> (!button_pressed()) {
+            display_stop();
+            update_timers();
+            green_pwm_off();  <span class="comment">// force green off</span>
+        }
+        debounce_delay();
+
+        <span class="comment">// ====== WARNING PHASE ======</span>
+        cross_active = <span class="val">1</span>;
+        reset_cross_timer();
+        set_led(RED, OFF);
+        set_led(YELLOW, ON);
+        wait_seconds(<span class="val">1</span>, display_stop);
+
+        <span class="comment">// ====== CROSSING PHASE ======</span>
+        set_led(RED, OFF);
+        set_led(YELLOW, OFF);
+        reset_cross_timer();
+        <span class="type">int</span> countdown = <span class="val">60</span>;
+
+        <span class="keyword">while</span> (countdown > <span class="val">0</span>) {
+            display_countdown_and_go(countdown);
+            update_timers();
+
+            <span class="comment">// Buzzer: beep based on TIM2 bit 9</span>
+            <span class="keyword">if</span> (TIM2->CNT & <span class="val">0x200</span>)
+                buzzer_on();
+            <span class="keyword">else</span>
+                buzzer_off();
+
+            <span class="comment">// Green LED control</span>
+            <span class="keyword">if</span> (countdown > <span class="val">10</span>) {
+                set_green_pwm();  <span class="comment">// steady</span>
+            } <span class="keyword">else</span> {
+                <span class="comment">// Blink: 2s ON, 2s OFF pattern</span>
+                <span class="type">int</span> phase = (countdown - <span class="val">1</span>) % <span class="val">4</span>;
+                <span class="keyword">if</span> (phase >= <span class="val">2</span>)
+                    set_green_pwm();
+                <span class="keyword">else</span>
+                    green_pwm_off();
+            }
+
+            <span class="comment">// Button resets countdown to 60</span>
+            <span class="keyword">if</span> (button_pressed()) {
+                countdown = <span class="val">60</span>;
+                reset_cross_timer();
+            }
+
+            <span class="keyword">if</span> (consume_second())
+                countdown--;
+        }
+
+        <span class="comment">// ====== END CROSSING ======</span>
+        buzzer_off();
+        green_pwm_off();
+        wait_seconds(<span class="val">1</span>, display_00_go);
+
+        set_led(YELLOW, ON);
+        wait_seconds(<span class="val">1</span>, display_stop);
+    }  <span class="comment">// loop back to IDLE</span>
+}</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 10: IMPORTANT OBSERVATIONS                         -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section" id="sec10">
+  <div class="section-header"><h2>🔟 Important Observations</h2></div>
+  <div class="section-body">
+
+    <details>
+      <summary>✅ Clever Design Choices</summary>
+      <div class="detail-body">
+        <ul>
+          <li><strong>Bit-9 buzzer toggle:</strong> Using bit 9 of the free-running TIM2 counter for buzzer timing is elegant — it creates a ~1 Hz tone without any additional counter variable or timer channel. Zero software overhead.</li>
+          <li><strong>EOR toggle:</strong> <code>EOR R7, R7, #1</code> for the day/night toggle is the optimal single-bit flip — one instruction, no branches.</li>
+          <li><strong>Accumulator-drain loops:</strong> The <code>while (acc >= period) { acc -= period; action(); }</code> pattern correctly handles timing lag — if the main loop was slow for one iteration, multiple seconds/toggles are processed in the next call. No ticks are lost.</li>
+          <li><strong>Counting semaphore:</strong> <code>SECOND_FLAG</code> acts as a counting semaphore (producer-consumer pattern). <code>UPDATE_TIMERS</code> produces (increments) and <code>CONSUME_SECOND_FLAG</code> consumes (decrements). This decouples the timer from the consumer.</li>
+          <li><strong>Conditional execution:</strong> Using <code>ORRNE</code>/<code>BICNE</code> for segment mapping avoids 7 branch instructions per digit, saving both code size and execution time.</li>
+          <li><strong>POP {…, PC}:</strong> The return-via-PC-pop pattern is a standard ARM optimization that saves one instruction per function return.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>⚠️ Potential Issues & Inefficiencies</summary>
+      <div class="detail-body">
+        <ul>
+          <li>
+            <strong>No debounce during crossing:</strong> The button reset during crossing (line 473–479) has NO debounce delay. A single button press could be detected across multiple loop iterations (button held for >1 loop), repeatedly resetting the timer. However, since the reset just reloads 60, repeated resets have the same effect, so this is benign in practice.
+          </li>
+          <li>
+            <strong>Hard-coded blink pattern:</strong> The blink logic (lines 437–458) uses a cascade of CMP/BGT instructions with hard-coded thresholds. A more maintainable approach would use modular arithmetic: <code>blink_on = ((countdown - 1) / 2) % 2 == 1</code>. However, the hard-coded version is arguably clearer for readers.
+          </li>
+          <li>
+            <strong>Division by repeated subtraction:</strong> <code>CALC_TENS_LOOP</code> divides by 10 using repeated subtraction. For a max value of 60, this means at most 6 iterations — negligible, but a hardware divide instruction (<code>UDIV</code>, available on Cortex-M4) would be faster for larger values.
+          </li>
+          <li>
+            <strong>Busy-wait delays:</strong> <code>SHORT_DELAY</code> and <code>DELAY_SHORT</code> use busy-wait loops. These waste CPU cycles and block other processing. In a production system, these would use timer interrupts or the SysTick timer. Acceptable for a prototype.
+          </li>
+          <li>
+            <strong>No WFI (Wait For Interrupt):</strong> The polling loops burn CPU at 100% constantly. Using <code>WFI</code> between timer checks would dramatically reduce power consumption — important for a battery-powered crossing controller.
+          </li>
+          <li>
+            <strong>Display flicker:</strong> Each digit is shown for only ~0.56 ms (<code>MUX_DELAY = 3000</code>). With 6 digits to multiplex per pass, the full cycle takes ~3.4 ms (~294 Hz refresh). This is adequate but could flicker on fast cameras. Increasing <code>MUX_DELAY</code> would reduce flicker but slow the main loop.
+          </li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>🐛 Potential Bugs</summary>
+      <div class="detail-body">
+        <ul>
+          <li>
+            <strong>SECOND_FLAG race condition (minor):</strong> <code>UPDATE_TIMERS</code> and <code>CONSUME_SECOND_FLAG</code> both read-modify-write <code>SECOND_FLAG</code>. Since there are no interrupts and the code is single-threaded polled, this is not actually a bug. However, if interrupts were ever added, this would become a critical race condition requiring atomic operations or critical sections.
+          </li>
+          <li>
+            <strong>No minimum vector table:</strong> The vector table has only 2 entries (SP + Reset). If any fault occurs (HardFault, NMI, etc.), the processor will read garbage from unmapped memory as the handler address, likely entering an infinite fault loop. In production, at least a HardFault handler should be defined.
+          </li>
+          <li>
+            <strong>TIM2 CNT wrap-around:</strong> Subtraction <code>R3 = R1 - R2</code> works correctly for 32-bit unsigned wrap-around (e.g., 0x00000005 - 0xFFFFFFF0 = 0x00000015 = 21). However, if <code>UPDATE_TIMERS</code> is not called for >49.7 days (2³² ms), the delta would be wrong. Not a realistic concern.
+          </li>
+          <li>
+            <strong>Green PWM called repeatedly:</strong> In the countdown loop, <code>GREEN_PWM_CURRENT_MODE</code> or <code>GREEN_PWM_OFF</code> is called every iteration, writing to <code>TIM3_CCR1</code> each time. With preload enabled (<code>OC1PE=1</code>), this is safe but unnecessary — a flag could skip redundant writes.
+          </li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>🔒 Security Concerns</summary>
+      <div class="detail-body">
+        <ul>
+          <li><strong>No memory protection:</strong> The code runs in privileged mode with full access to all peripherals. An errant pointer could write to any peripheral register or overwrite SRAM. The Cortex-M4's MPU (Memory Protection Unit) is not configured.</li>
+          <li><strong>No watchdog timer:</strong> If the software hangs (e.g., a tight loop bug), there is no watchdog to reset the system. A production crossing controller should enable IWDG (Independent Watchdog).</li>
+          <li><strong>No stack overflow protection:</strong> The stack grows toward the variables in SRAM. With only ~44 bytes of stack used and 128 KB of SRAM, overflow is extremely unlikely, but there is no guard region or canary.</li>
+          <li><strong>Button can extend crossing indefinitely:</strong> The timer-reset feature (line 478) means a malicious user could hold the button to keep the crossing green forever, blocking traffic. A production system should have a maximum total crossing time.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>💡 Interesting Low-Level Tricks</summary>
+      <div class="detail-body">
+        <ol>
+          <li>
+            <strong>Dual-type 7-segment driving:</strong> The same physical segment GPIO pins drive both common-cathode (countdown) and common-anode (word) displays. The code switches between <code>SET_SEGMENTS_CC</code> and <code>SET_SEGMENTS_CA</code> functions, which invert the driving logic (ORR vs BIC). This is uncommon and saves GPIO pins.
+          </li>
+          <li>
+            <strong>LTORG placement:</strong> The code carefully places <code>LTORG</code> directives after unconditional branches (<code>B</code>) and before new labels. This ensures literal pools are: (a) reachable from nearby <code>LDR Rn, =const</code> instructions, and (b) never executed as instructions.
+          </li>
+          <li>
+            <strong>Timer as RNG-like source:</strong> Using TIM2_CNT bit 9 for buzzer timing means the buzzer phase depends on when the loop happens to read the counter. This creates a pseudo-random feeling to the beep timing, though it's actually deterministic.
+          </li>
+          <li>
+            <strong>Zero-overhead mode change:</strong> The day/night mode changes are computed during every <code>UPDATE_TIMERS</code> call but only <em>applied</em> when the green LED is actually being driven. During IDLE, mode changes happen silently in the background. This is an elegant separation of concerns.
+          </li>
+        </ol>
+      </div>
+    </details>
+
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<!-- SCROLL TO TOP -->
+<button id="scrollTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+<!-- FOOTER -->
+<div class="footer">
+  <p>ARM Assembly Analysis — Zebra Crossing Light Controller (STM32F446RE NUCLEO-64)</p>
+  <p>Generated for educational purposes • 1169 lines of assembly analyzed • All content self-contained</p>
+</div>
+
+<script>
+// Scroll-to-top button visibility
+const btn = document.getElementById('scrollTop');
+window.addEventListener('scroll', () => {
+  btn.style.display = window.scrollY > 400 ? 'flex' : 'none';
+});
+
+// Smooth anchor scrolling with offset
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      const y = target.getBoundingClientRect().top + window.scrollY - 20;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  });
+});
+</script>
+
+</body>
+</html>
